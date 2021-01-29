@@ -1,1 +1,3 @@
 # ContrastiveSeg
+
+![](framework.png)
