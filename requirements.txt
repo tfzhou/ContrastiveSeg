@@ -1,0 +1,17 @@
+cython
+numpy
+cffi
+opencv-python
+scipy
+easydict
+matplotlib
+Pillow>=6.2.2
+torchcontrib
+yacs
+pyyaml
+visdom
+bs4
+html5lib
+ninja
+torch==0.4.1
+torchvision==0.2.1
