@@ -21,7 +21,7 @@ LOG_FILE="./log/cityscapes/${CHECKPOINTS_NAME}.log"
 echo "Logging to $LOG_FILE"
 mkdir -p `dirname $LOG_FILE`
 
-PRETRAINED_MODEL="/home/jc3/tfzhou/ContrastiveSeg/pretrained_model/resnet101-imagenet.pth"
+PRETRAINED_MODEL="pretrained_model/resnet101-imagenet.pth"
 MAX_ITERS=40000
 
 
@@ -34,13 +34,12 @@ if [ "$1"x == "train"x ]; then
                        --log_to_file n \
                        --backbone ${BACKBONE} \
                        --model_name ${MODEL_NAME} \
-                       --gpu 0 \
+                       --gpu 0 1 2 3 \
                        --data_dir ${DATA_DIR} \
                        --loss_type ${LOSS_TYPE} \
                        --max_iters ${MAX_ITERS} \
                        --checkpoints_name ${CHECKPOINTS_NAME} \
                        --pretrained ${PRETRAINED_MODEL} \
-                       --train_batch_size 2 \
                        2>&1 | tee ${LOG_FILE}
                        
 

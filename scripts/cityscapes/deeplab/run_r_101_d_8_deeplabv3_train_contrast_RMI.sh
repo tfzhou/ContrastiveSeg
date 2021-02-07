@@ -21,7 +21,7 @@ LOG_FILE="./log/cityscapes/${CHECKPOINTS_NAME}.log"
 echo "Logging to $LOG_FILE"
 mkdir -p `dirname $LOG_FILE`
 
-PRETRAINED_MODEL="/home/jc3/tfzhou/ContrastiveSeg/pretrained_model/resnet101-imagenet.pth"
+PRETRAINED_MODEL="pretrained_model/resnet101-imagenet.pth"
 MAX_ITERS=40000
 
 
