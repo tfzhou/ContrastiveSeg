@@ -8,7 +8,7 @@
 
 ## News
 
-* [2021-07-01] The codebase has been transferred from Pytorch-0.4.1 to Pytorch-1.7.1, which will be more easily for usage.
+* [2021-07-01] The codebase has been transferred from Pytorch-0.4.1 to Pytorch-1.7.1, which will be easier for usage.
 
 ## Abstract
 
@@ -37,10 +37,10 @@ Please follow the [Getting Started](https://github.com/openseg-group/openseg.pyt
 
 ### Cityscapes Dataset
 
-| Backbone  | Train Set | Val Set | Iterations | Batch Size | Contrast Loss | Memory | mIoU  | Script |
-| --------- | --------- | ------- | ---------- | ---------- | ------------- | ------ | ----- | ----   |
-| HRNet-W48 | train     | val     | 40000      | 8          | N             | N      | 79.27 |```scripts/cityscapes/hrnet/run_h_48_d_4.sh```|
-| HRNet-W48 | train     | val     | 40000      | 8          | Y             | N      | 80.17 |```scripts/cityscapes/hrnet/run_h_48_d_4_contrast.sh```|
+| Backbone  | Train Set | Val Set | Iterations | Batch Size | Contrast Loss | Memory | mIoU  | Log | Checkpoint |Script |
+| --------- | --------- | ------- | ---------- | ---------- | ------------- | ------ | ----- | --- | ----   | ----   |
+| HRNet-W48 | train     | val     | 40000      | 8          | N             | N      | 79.27 | [log](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/hrnet_w48_lr1x_hrnet_ce.log) | [ckpt](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/hrnet_w48_lr1x_hrnet_ce_max_performance.pth) |```scripts/cityscapes/hrnet/run_h_48_d_4.sh```|
+| HRNet-W48 | train     | val     | 40000      | 8          | Y             | N      | 80.18 | [log](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/hrnet_w48_contrast_lr1x_hrnet_contrast_t0.1.log) | [ckpt](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/hrnet_w48_contrast_lr1x_hrnet_contrast_t0.1_max_performance.pth) |```scripts/cityscapes/hrnet/run_h_48_d_4_contrast.sh```|
 
 
 ### Study of the temperature
@@ -48,7 +48,7 @@ Please follow the [Getting Started](https://github.com/openseg-group/openseg.pyt
 | --------- | --------- | ------- | ---------- | ---------- | ------------- | ----- |
 | HRNet-W48 | train     | val     | 40000      | 8          | 0.05          | 79.80 |
 | HRNet-W48 | train     | val     | 40000      | 8          | 0.07          | 79.59 |
-| HRNet-W48 | train     | val     | 40000      | 8          | 0.10          | 80.17 |
+| HRNet-W48 | train     | val     | 40000      | 8          | 0.10          | **80.18** |
 | HRNet-W48 | train     | val     | 40000      | 8          | 0.20          | 80.01 |
 | HRNet-W48 | train     | val     | 40000      | 8          | 0.30          | 79.27 |
 | HRNet-W48 | train     | val     | 40000      | 8          | 0.40          | 79.40 |
