@@ -37,7 +37,7 @@ Please follow the [Getting Started](https://github.com/openseg-group/openseg.pyt
 
 ### Cityscapes Dataset
 
-| Backbone  | Train Set | Val Set | Iterations | Batch Size | Contrast Loss | Memory | mIoU  | Log | Checkpoint |Script |
+| Backbone  | Train Set | Val Set | Iterations | Batch Size | Contrast Loss | Memory | mIoU  | Log | CKPT |Script |
 | --------- | --------- | ------- | ---------- | ---------- | ------------- | ------ | ----- | --- | ----   | ----   |
 | HRNet-W48 | train     | val     | 40000      | 8          | N             | N      | 79.27 | [log](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/hrnet_w48_lr1x_hrnet_ce.log) | [ckpt](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/hrnet_w48_lr1x_hrnet_ce_max_performance.pth) |```scripts/cityscapes/hrnet/run_h_48_d_4.sh```|
 | HRNet-W48 | train     | val     | 40000      | 8          | Y             | N      | 80.18 | [log](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/hrnet_w48_contrast_lr1x_hrnet_contrast_t0.1.log) | [ckpt](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/hrnet_w48_contrast_lr1x_hrnet_contrast_t0.1_max_performance.pth) |```scripts/cityscapes/hrnet/run_h_48_d_4_contrast.sh```|
