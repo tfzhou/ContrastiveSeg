@@ -15,10 +15,12 @@ from collections import OrderedDict
 import torch
 import torch.nn as nn
 from torch.nn.parallel.scatter_gather import gather as torch_gather
+from torch.nn.functional import interpolate
 
 from lib.extensions.parallel.data_parallel import DataParallelModel
 from lib.utils.tools.logger import Logger as Log
 from lib.utils.distributed import get_rank, is_distributed
+
 
 class ModuleRunner(object):
 
@@ -38,8 +40,8 @@ class ModuleRunner(object):
         if not self.configer.exists('network', 'bn_type'):
             self.configer.add(['network', 'bn_type'], 'torchbn')
 
-        if self.configer.get('phase') == 'train':
-            assert len(self.configer.get('gpu')) > 1 or self.configer.get('network', 'bn_type') == 'torchbn'
+        # if self.configer.get('phase') == 'train':
+        #     assert len(self.configer.get('gpu')) > 1 or self.configer.get('network', 'bn_type') == 'torchbn'
 
         Log.info('BN Type is {}.'.format(self.configer.get('network', 'bn_type')))
 
@@ -65,6 +67,7 @@ class ModuleRunner(object):
                 net,
                 device_ids=[local_rank],
                 output_device=local_rank,
+                find_unused_parameters=True,
             )
 
         if len(self.configer.get('gpu')) == 1:
@@ -82,7 +85,7 @@ class ModuleRunner(object):
         net.float()
         if self.configer.get('network', 'resume') is not None:
             Log.info('Loading checkpoint from {}...'.format(self.configer.get('network', 'resume')))
-            resume_dict = torch.load(self.configer.get('network', 'resume'))
+            resume_dict = torch.load(self.configer.get('network', 'resume'), map_location=lambda storage, loc: storage)
             if 'state_dict' in resume_dict:
                 checkpoint_dict = resume_dict['state_dict']
 
@@ -98,6 +101,8 @@ class ModuleRunner(object):
 
             if list(checkpoint_dict.keys())[0].startswith('module.'):
                 checkpoint_dict = {k[7:]: v for k, v in checkpoint_dict.items()}
+            # if list(checkpoint_dict.keys())[0].startswith('backbone.'):
+            #     checkpoint_dict = {'encoder_q.'+k: v for k, v in checkpoint_dict.items()}
 
             # load state_dict
             if hasattr(net, 'module'):
@@ -105,8 +110,11 @@ class ModuleRunner(object):
             else:
                 self.load_state_dict(net, checkpoint_dict, self.configer.get('network', 'resume_strict'))
 
+            # data_dir = self.configer.get('data', 'data_dir')
+            # if self.configer.get('network', 'resume_continue'):
+            #     self.configer.update(resume_dict['config_dict'])
             if self.configer.get('network', 'resume_continue'):
-                self.configer.resume(resume_dict['config_dict'])
+                self.configer.update(['network', 'resume'], None)
 
         return net
 
@@ -157,7 +165,7 @@ class ModuleRunner(object):
             else:
                 Log.warn(err_msg)
 
-    def save_net(self, net, save_mode='iters'):
+    def save_net(self, net, save_mode='iters', experiment=None):
         if is_distributed() and get_rank() != 0:
             return
 
@@ -208,6 +216,14 @@ class ModuleRunner(object):
         else:
             Log.error('Metric: {} is invalid.'.format(save_mode))
             exit(1)
+
+        if experiment is not None:
+            experiment.checkpoint(
+                path=os.path.join(checkpoints_dir, latest_name),
+                step=self.configer.get('iters'),
+                metrics={'mIoU': self.configer.get('performance'), 'loss': self.configer.get('val_loss')},
+                primary_metric=("mIoU", "maximize")
+            )
 
     def freeze_bn(self, net, syncbn=False):
         for m in net.modules():

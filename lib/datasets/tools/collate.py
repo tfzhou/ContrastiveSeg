@@ -78,6 +78,7 @@ def collate(batch, trans_dict):
             continue
 
         scaled_size = [width, height]
+        # Log.info('{} {} {} {} {}'.format(target_width, target_height, scaled_size[0], scaled_size[1], trans_dict['align_method']))
 
         if trans_dict['align_method'] in ['only_scale', 'scale_and_pad']:
             w_scale_ratio = target_width / width

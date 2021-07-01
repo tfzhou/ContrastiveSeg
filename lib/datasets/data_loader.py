@@ -12,18 +12,21 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import pdb
 import torch
 from torch.utils import data
-from torchvision import transforms as torch_trans
 
 import lib.datasets.tools.transforms as trans
-from lib.datasets.loader.ade20k_loader import ADE20KLoader
+import lib.datasets.tools.cv2_aug_transforms as cv2_aug_trans
+import lib.datasets.tools.pil_aug_transforms as pil_aug_trans
 from lib.datasets.loader.default_loader import DefaultLoader, CSDataTestLoader
+from lib.datasets.loader.ade20k_loader import ADE20KLoader
 from lib.datasets.loader.lip_loader import LipLoader
 from lib.datasets.loader.offset_loader import DTOffsetLoader
 from lib.datasets.tools.collate import collate
-from lib.utils.distributed import get_world_size, is_distributed
 from lib.utils.tools.logger import Logger as Log
+
+from lib.utils.distributed import get_world_size, get_rank, is_distributed
 
 
 class DataLoader(object):
@@ -35,21 +38,15 @@ class DataLoader(object):
         self.aug_train_transform = cv2_aug_transforms.CV2AugCompose(self.configer, split='train')
         self.aug_val_transform = cv2_aug_transforms.CV2AugCompose(self.configer, split='val')
 
-        self.torch_img_transform = torch_trans.ColorJitter(
-            brightness=self.configer.get('train_trans', 'color_aug'),
-            contrast=self.configer.get('train_trans', 'color_aug'),
-            saturation=self.configer.get('train_trans', 'color_aug'),
-            hue=self.configer.get('train_trans', 'color_aug'))
-
         self.img_transform = trans.Compose([
             trans.ToTensor(),
             trans.Normalize(div_value=self.configer.get('normalize', 'div_value'),
                             mean=self.configer.get('normalize', 'mean'),
-                            std=self.configer.get('normalize', 'std'))])
+                            std=self.configer.get('normalize', 'std')), ])
 
         self.label_transform = trans.Compose([
             trans.ToLabel(),
-            trans.ReLabel(255, -1)])
+            trans.ReLabel(255, -1), ])
 
     def get_dataloader_sampler(self, klass, split, dataset):
 
@@ -63,7 +60,6 @@ class DataLoader(object):
             dataset=dataset,
             aug_transform=(self.aug_train_transform if split == 'train' else self.aug_val_transform),
             img_transform=self.img_transform,
-            torch_img_transform=(self.torch_img_transform if split == 'train' else None),
             label_transform=self.label_transform,
             configer=self.configer
         )
@@ -116,10 +112,11 @@ class DataLoader(object):
             klass = DTOffsetLoader
 
         elif self.configer.exists('train', 'loader') and \
-            (self.configer.get('train', 'loader') == 'ade20k' 
-             or self.configer.get('train', 'loader') == 'pascal_context'
-             or self.configer.get('train', 'loader') == 'pascal_voc'
-             or self.configer.get('train', 'loader') == 'coco_stuff'):
+                (self.configer.get('train', 'loader') == 'ade20k'
+                 or self.configer.get('train', 'loader') == 'pascal_context'
+                 or self.configer.get('train', 'loader') == 'pascal_voc'
+                 or self.configer.get('train', 'loader') == 'coco_stuff'
+                 or self.configer.get('train', 'loader') == 'camvid'):
             """
             ADE20KLoader manner:
             support input images of different shapes.
@@ -147,7 +144,6 @@ class DataLoader(object):
             )
         )
         return trainloader
-            
 
     def get_valloader(self, dataset=None):
         dataset = 'val' if dataset is None else dataset
@@ -156,7 +152,7 @@ class DataLoader(object):
             """
             dt-offset manner:
             load both the ground-truth label and offset (based on distance transform).
-            """   
+            """
             Log.info('use distance transform based offset loader for val ...')
             klass = DTOffsetLoader
 
@@ -164,7 +160,7 @@ class DataLoader(object):
             """
             default manner:
             load the ground-truth label.
-            """   
+            """
             Log.info('use DefaultLoader for val ...')
             klass = DefaultLoader
         else:
@@ -184,34 +180,38 @@ class DataLoader(object):
         return valloader
 
     def get_testloader(self, dataset=None):
-            dataset = 'test' if dataset is None else dataset
-            if self.configer.exists('data', 'use_sw_offset') or self.configer.exists('data', 'pred_sw_offset'):
-                Log.info('use sliding window based offset loader for test ...')
-                test_loader = data.DataLoader(
-                    SWOffsetTestLoader(root_dir=self.configer.get('data', 'data_dir'), dataset=dataset,
-                                       img_transform=self.img_transform,
-                                       configer=self.configer),
-                    batch_size=self.configer.get('test', 'batch_size'), pin_memory=True,
-                    num_workers=self.configer.get('data', 'workers'), shuffle=False,
-                    collate_fn=lambda *args: collate(
-                        *args, trans_dict=self.configer.get('test', 'data_transformer')
-                    )
+        dataset = 'test' if dataset is None else dataset
+        if self.configer.exists('data', 'use_sw_offset') or self.configer.exists('data', 'pred_sw_offset'):
+            Log.info('use sliding window based offset loader for test ...')
+            test_loader = data.DataLoader(
+                SWOffsetTestLoader(root_dir=self.configer.get('data', 'data_dir'), dataset=dataset,
+                                   img_transform=self.img_transform,
+                                   configer=self.configer),
+                batch_size=self.configer.get('test', 'batch_size'), pin_memory=True,
+                num_workers=self.configer.get('data', 'workers'), shuffle=False,
+                collate_fn=lambda *args: collate(
+                    *args, trans_dict=self.configer.get('test', 'data_transformer')
                 )
-                return test_loader
+            )
+            return test_loader
 
-            elif self.configer.get('method') == 'fcn_segmentor':
-                Log.info('use CSDataTestLoader for test ...')
-                test_loader = data.DataLoader(
-                    CSDataTestLoader(root_dir=self.configer.get('data', 'data_dir'), dataset=dataset,
-                                     img_transform=self.img_transform,
-                                     configer=self.configer),
-                    batch_size=self.configer.get('test', 'batch_size'), pin_memory=True,
-                    num_workers=self.configer.get('data', 'workers'), shuffle=False,
-                    collate_fn=lambda *args: collate(
-                        *args, trans_dict=self.configer.get('test', 'data_transformer')
-                    )
+        elif self.configer.get('method') == 'fcn_segmentor':
+            Log.info('use CSDataTestLoader for test ...')
+
+            root_dir = self.configer.get('data', 'data_dir')
+            if isinstance(root_dir, list) and len(root_dir) == 1:
+                root_dir = root_dir[0]
+            test_loader = data.DataLoader(
+                CSDataTestLoader(root_dir=root_dir, dataset=dataset,
+                                 img_transform=self.img_transform,
+                                 configer=self.configer),
+                batch_size=self.configer.get('test', 'batch_size'), pin_memory=True,
+                num_workers=self.configer.get('data', 'workers'), shuffle=False,
+                collate_fn=lambda *args: collate(
+                    *args, trans_dict=self.configer.get('test', 'data_transformer')
                 )
-                return test_loader
+            )
+            return test_loader
 
 
 if __name__ == "__main__":

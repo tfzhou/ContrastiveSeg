@@ -10,7 +10,7 @@
       "workers": 8
     },
    "train": {
-      "batch_size": 8,
+      "batch_size": 16,
       "data_transformer": {
         "size_mode": "fix_size",
         "input_size": [1024, 512],
@@ -19,7 +19,7 @@
       }
     },
     "val": {
-      "batch_size": 4,
+      "batch_size": 8,
       "mode": "ss_test",
       "data_transformer": {
         "size_mode": "fix_size",
@@ -78,7 +78,7 @@
       "backbone": "deepbase_resnet101_dilated8",
       "multi_grid": [1, 1, 1],
       "model_name": "base_ocnet",
-      "bn_type": "inplace_abn",
+      "bn_type": "torchsyncbn",
       "stride": 8,
       "factors": [[8, 8]],
       "loss_weights": {
@@ -132,5 +132,16 @@
         "ohem_minkeep": 100000,
         "ohem_thresh": 0.9
       }
+    },
+    "contrast": {
+      "proj_dim": 256,
+      "temperature": 0.1,
+      "base_temperature": 0.07,
+      "max_samples": 1024,
+      "max_views": 100,
+      "stride": 8,
+      "warmup_iters": 5000,
+      "loss_weight": 0.1,
+      "use_rmi": false
     }
 }

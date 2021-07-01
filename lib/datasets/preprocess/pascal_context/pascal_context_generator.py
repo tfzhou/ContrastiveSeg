@@ -41,8 +41,8 @@ class PContextGenerator(object):
         if not os.path.exists(self.val_image_dir):
             os.makedirs(self.val_image_dir)
         
-        self.train_mask = torch.load(os.path.join(self.args.ori_root_dir, "PytorchEncoding/train.pth"))
-        self.val_mask = torch.load(os.path.join(self.args.ori_root_dir, "PytorchEncoding/val.pth"))
+        self.train_mask = torch.load(os.path.join( "train.pth"))
+        self.val_mask = torch.load(os.path.join("val.pth"))
     
 
     def generate_label(self):

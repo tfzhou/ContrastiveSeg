@@ -91,6 +91,8 @@ if __name__ == "__main__":
                         dest='network:resume_strict', help='Fully match keys or not.')
     parser.add_argument('--resume_continue', type=str2bool, nargs='?', default=False,
                         dest='network:resume_continue', help='Whether to continue training.')
+    parser.add_argument('--finetune', type=str2bool, nargs='?', default=False,
+                        dest='network:finetune', help='Whether to start finetune.')
     parser.add_argument('--resume_eval_train', type=str2bool, nargs='?', default=True,
                         dest='network:resume_train', help='Whether to validate the training set  during resume.')
     parser.add_argument('--resume_eval_val', type=str2bool, nargs='?', default=True,

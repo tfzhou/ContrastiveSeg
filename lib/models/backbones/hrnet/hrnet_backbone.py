@@ -20,9 +20,9 @@ import numpy as np
 from lib.models.tools.module_helper import ModuleHelper
 from lib.utils.tools.logger import Logger as Log
 
-if torch.__version__.startswith('1'):	
-    relu_inplace = True	
-else:	
+if torch.__version__.startswith('1'):
+    relu_inplace = True
+else:
     relu_inplace = False
 
 
@@ -147,7 +147,7 @@ class HighResolutionModule(nn.Module):
                          stride=1, bn_type=None, bn_momentum=0.1):
         downsample = None
         if stride != 1 or \
-           self.num_inchannels[branch_index] != num_channels[branch_index] * block.expansion:
+                self.num_inchannels[branch_index] != num_channels[branch_index] * block.expansion:
             downsample = nn.Sequential(
                 nn.Conv2d(
                     self.num_inchannels[branch_index],
@@ -155,7 +155,7 @@ class HighResolutionModule(nn.Module):
                     kernel_size=1, stride=stride, bias=False
                 ),
                 ModuleHelper.BatchNorm2d(bn_type=bn_type)(
-                    num_channels[branch_index] * block.expansion, 
+                    num_channels[branch_index] * block.expansion,
                     momentum=bn_momentum
                 ),
             )
@@ -177,7 +177,7 @@ class HighResolutionModule(nn.Module):
             layers.append(
                 block(
                     self.num_inchannels[branch_index],
-                    num_channels[branch_index], 
+                    num_channels[branch_index],
                     bn_type=bn_type,
                     bn_momentum=bn_momentum
                 )
@@ -211,9 +211,9 @@ class HighResolutionModule(nn.Module):
                             nn.Conv2d(
                                 num_inchannels[j],
                                 num_inchannels[i],
-                                1, 
-                                1, 
-                                0, 
+                                1,
+                                1,
+                                0,
                                 bias=False
                             ),
                             ModuleHelper.BatchNorm2d(bn_type=bn_type)(num_inchannels[i], momentum=bn_momentum),
@@ -223,7 +223,7 @@ class HighResolutionModule(nn.Module):
                     fuse_layer.append(None)
                 else:
                     conv3x3s = []
-                    for k in range(i-j):
+                    for k in range(i - j):
                         if k == i - j - 1:
                             num_outchannels_conv3x3 = num_inchannels[i]
                             conv3x3s.append(
@@ -233,7 +233,8 @@ class HighResolutionModule(nn.Module):
                                         num_outchannels_conv3x3,
                                         3, 2, 1, bias=False
                                     ),
-                                    ModuleHelper.BatchNorm2d(bn_type=bn_type)(num_outchannels_conv3x3, momentum=bn_momentum)
+                                    ModuleHelper.BatchNorm2d(bn_type=bn_type)(num_outchannels_conv3x3,
+                                                                              momentum=bn_momentum)
                                 )
                             )
                         else:
@@ -245,7 +246,8 @@ class HighResolutionModule(nn.Module):
                                         num_outchannels_conv3x3,
                                         3, 2, 1, bias=False
                                     ),
-                                    ModuleHelper.BatchNorm2d(bn_type=bn_type)(num_outchannels_conv3x3, momentum=bn_momentum),
+                                    ModuleHelper.BatchNorm2d(bn_type=bn_type)(num_outchannels_conv3x3,
+                                                                              momentum=bn_momentum),
                                     nn.ReLU(inplace=False)
                                 )
                             )
@@ -302,17 +304,17 @@ class HighResolutionNet(nn.Module):
             Log.info("using full-resolution stem with stride=1")
             stem_stride = 1
             self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=stem_stride, padding=1,
-                                bias=False)
+                                   bias=False)
             self.bn1 = ModuleHelper.BatchNorm2d(bn_type=bn_type)(64, momentum=bn_momentum)
             self.relu = nn.ReLU(inplace=False)
-            self.layer1 = self._make_layer(Bottleneck, 64, 64, 4, bn_type=bn_type, bn_momentum=bn_momentum)        
+            self.layer1 = self._make_layer(Bottleneck, 64, 64, 4, bn_type=bn_type, bn_momentum=bn_momentum)
         else:
             stem_stride = 2
             self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=stem_stride, padding=1,
-                                bias=False)
+                                   bias=False)
             self.bn1 = ModuleHelper.BatchNorm2d(bn_type=bn_type)(64, momentum=bn_momentum)
             self.conv2 = nn.Conv2d(64, 64, kernel_size=3, stride=stem_stride, padding=1,
-                                bias=False)
+                                   bias=False)
             self.bn2 = ModuleHelper.BatchNorm2d(bn_type=bn_type)(64, momentum=bn_momentum)
             self.relu = nn.ReLU(inplace=False)
             self.layer1 = self._make_layer(Bottleneck, 64, 64, 4, bn_type=bn_type, bn_momentum=bn_momentum)
@@ -325,7 +327,7 @@ class HighResolutionNet(nn.Module):
         ]
 
         self.transition1 = self._make_transition_layer([256], num_channels, bn_type=bn_type, bn_momentum=bn_momentum)
-        
+
         self.stage2, pre_stage_channels = self._make_stage(
             self.stage2_cfg, num_channels, bn_type=bn_type, bn_momentum=bn_momentum)
 
@@ -354,7 +356,7 @@ class HighResolutionNet(nn.Module):
 
         if os.environ.get('keep_imagenet_head'):
             self.incre_modules, self.downsamp_modules, \
-                self.final_layer = self._make_head(pre_stage_channels, bn_type=bn_type, bn_momentum=bn_momentum)
+            self.final_layer = self._make_head(pre_stage_channels, bn_type=bn_type, bn_momentum=bn_momentum)
 
     def _make_head(self, pre_stage_channels, bn_type, bn_momentum):
         head_block = Bottleneck
@@ -366,22 +368,22 @@ class HighResolutionNet(nn.Module):
         # Increasing the #channels on each resolution 
         # from C, 2C, 4C, 8C to 128, 256, 512, 1024
         incre_modules = []
-        for i, channels  in enumerate(pre_stage_channels):
+        for i, channels in enumerate(pre_stage_channels):
             incre_module = self._make_layer(head_block,
                                             channels,
                                             head_channels[i],
                                             1,
-                                            bn_type=bn_type, 
+                                            bn_type=bn_type,
                                             bn_momentum=bn_momentum
                                             )
             incre_modules.append(incre_module)
         incre_modules = nn.ModuleList(incre_modules)
-            
+
         # downsampling modules
         downsamp_modules = []
-        for i in range(len(pre_stage_channels)-1):
+        for i in range(len(pre_stage_channels) - 1):
             in_channels = head_channels[i] * head_block.expansion
-            out_channels = head_channels[i+1] * head_block.expansion
+            out_channels = head_channels[i + 1] * head_block.expansion
 
             downsamp_module = nn.Sequential(
                 nn.Conv2d(in_channels=in_channels,
@@ -422,9 +424,9 @@ class HighResolutionNet(nn.Module):
                             nn.Conv2d(
                                 num_channels_pre_layer[i],
                                 num_channels_cur_layer[i],
-                                3, 
-                                1, 
-                                1, 
+                                3,
+                                1,
+                                1,
                                 bias=False
                             ),
                             ModuleHelper.BatchNorm2d(bn_type=bn_type)(num_channels_cur_layer[i], momentum=bn_momentum),
@@ -435,18 +437,18 @@ class HighResolutionNet(nn.Module):
                     transition_layers.append(None)
             else:
                 conv3x3s = []
-                for j in range(i+1-num_branches_pre):
+                for j in range(i + 1 - num_branches_pre):
                     inchannels = num_channels_pre_layer[-1]
                     outchannels = num_channels_cur_layer[i] \
-                        if j == i-num_branches_pre else inchannels
+                        if j == i - num_branches_pre else inchannels
                     conv3x3s.append(
                         nn.Sequential(
                             nn.Conv2d(
-                                inchannels, 
-                                outchannels, 
-                                3, 
-                                2, 
-                                1, 
+                                inchannels,
+                                outchannels,
+                                3,
+                                2,
+                                1,
                                 bias=False
                             ),
                             ModuleHelper.BatchNorm2d(bn_type=bn_type)(outchannels, momentum=bn_momentum),
@@ -524,7 +526,7 @@ class HighResolutionNet(nn.Module):
             x = self.conv2(x)
             x = self.bn2(x)
             x = self.relu(x)
-        
+
         x = self.layer1(x)
         x_list = []
         for i in range(self.stage2_cfg['NUM_BRANCHES']):
@@ -559,14 +561,14 @@ class HighResolutionNet(nn.Module):
             y = self.incre_modules[0](y_list[0])
             x_list.append(y)
             for i in range(len(self.downsamp_modules)):
-                y = self.incre_modules[i+1](y_list[i+1]) + \
-                            self.downsamp_modules[i](y)
+                y = self.incre_modules[i + 1](y_list[i + 1]) + \
+                    self.downsamp_modules[i](y)
                 x_list.append(y)
-            
+
             y = self.final_layer(y)
             del x_list[-1]
             x_list.append(y)
-            
+
             return x_list
 
         return y_list
@@ -645,10 +647,10 @@ class HighResolutionNext(nn.Module):
                     transition_layers.append(None)
             else:
                 conv3x3s = []
-                for j in range(i+1-num_branches_pre):
+                for j in range(i + 1 - num_branches_pre):
                     inchannels = num_channels_pre_layer[-1]
                     outchannels = num_channels_cur_layer[i] \
-                        if j == i-num_branches_pre else inchannels
+                        if j == i - num_branches_pre else inchannels
                     conv3x3s.append(
                         nn.Sequential(
                             nn.Conv2d(
@@ -743,52 +745,58 @@ class HRNetBackbone(object):
 
     def __call__(self):
         arch = self.configer.get('network', 'backbone')
+        resume = self.configer.get('network', 'resume')
         from lib.models.backbones.hrnet.hrnet_config import MODEL_CONFIGS
 
         if arch == 'hrnet18':
-            arch_net = HighResolutionNet(MODEL_CONFIGS['hrnet18'], 
-                                         bn_type='inplace_abn',
+            arch_net = HighResolutionNet(MODEL_CONFIGS['hrnet18'],
+                                         bn_type='torchsyncbn',
                                          bn_momentum=0.1)
-            arch_net = ModuleHelper.load_model(arch_net, 
-                                               pretrained=self.configer.get('network', 'pretrained'), 
-                                               all_match=False,
-                                               network='hrnet')
+            if resume is None:
+                arch_net = ModuleHelper.load_model(arch_net,
+                                                   pretrained=self.configer.get('network', 'pretrained'),
+                                                   all_match=False,
+                                                   network='hrnet')
 
         elif arch == 'hrnet32':
-            arch_net = HighResolutionNet(MODEL_CONFIGS['hrnet32'], 
-                                         bn_type='inplace_abn',
+            arch_net = HighResolutionNet(MODEL_CONFIGS['hrnet32'],
+                                         bn_type='torchsyncbn',
                                          bn_momentum=0.1)
-            arch_net = ModuleHelper.load_model(arch_net, 
-                                               pretrained=self.configer.get('network', 'pretrained'), 
-                                               all_match=False,
-                                               network='hrnet')
+            if resume is None:
+                arch_net = ModuleHelper.load_model(arch_net,
+                                                   pretrained=self.configer.get('network', 'pretrained'),
+                                                   all_match=False,
+                                                   network='hrnet')
 
         elif arch == 'hrnet48':
             arch_net = HighResolutionNet(MODEL_CONFIGS['hrnet48'],
-                                         bn_type='inplace_abn',
+                                         bn_type='torchsyncbn',
                                          bn_momentum=0.1)
-            arch_net = ModuleHelper.load_model(arch_net, 
-                                               pretrained=self.configer.get('network', 'pretrained'), 
-                                               all_match=False,
-                                               network='hrnet')
+            if resume is None:
+                arch_net = ModuleHelper.load_model(arch_net,
+                                                   pretrained=self.configer.get('network', 'pretrained'),
+                                                   all_match=False,
+                                                   network='hrnet')
 
         elif arch == 'hrnet64':
             arch_net = HighResolutionNet(MODEL_CONFIGS['hrnet64'],
-                                         bn_type='inplace_abn',
+                                         bn_type='torchsyncbn',
                                          bn_momentum=0.1)
-            arch_net = ModuleHelper.load_model(arch_net, 
-                                               pretrained=self.configer.get('network', 'pretrained'), 
-                                               all_match=False,
-                                               network='hrnet')        
+            if resume is None:
+                arch_net = ModuleHelper.load_model(arch_net,
+                                                   pretrained=self.configer.get('network', 'pretrained'),
+                                                   all_match=False,
+                                                   network='hrnet')
 
         elif arch == 'hrnet2x20':
-            arch_net = HighResolutionNext(MODEL_CONFIGS['hrnet2x20'], 
-                                         bn_type=self.configer.get('network', 'bn_type'))
-            arch_net = ModuleHelper.load_model(arch_net, 
-                                               pretrained=self.configer.get('network', 'pretrained'), 
-                                               all_match=False,
-                                               network='hrnet')
-                                               
+            arch_net = HighResolutionNext(MODEL_CONFIGS['hrnet2x20'],
+                                          bn_type=self.configer.get('network', 'bn_type'))
+            if resume is None:
+                arch_net = ModuleHelper.load_model(arch_net,
+                                                   pretrained=self.configer.get('network', 'pretrained'),
+                                                   all_match=False,
+                                                   network='hrnet')
+
         else:
             raise Exception('Architecture undefined!')
 

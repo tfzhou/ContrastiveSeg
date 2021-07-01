@@ -2,14 +2,16 @@
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 cd $SCRIPTPATH
 cd ../../../
+. config.profile
 # check the enviroment info
 nvidia-smi
+${PYTHON} -m pip install torchcontrib
+${PYTHON} -m pip install git+https://github.com/lucasb-eyer/pydensecrf.git
 
+export PYTHONPATH="$PWD":$PYTHONPATH
 
-DATA_ROOT="/home/jc3/tfzhou/datasets/"
-
-DATA_DIR="${DATA_ROOT}/cityscapes-openseg"
-SAVE_DIR="${DATA_ROOT}/cityscapes-openseg/seg_results/"
+DATA_DIR="${DATA_ROOT}/cityscapes"
+SAVE_DIR="${DATA_ROOT}/seg_result/cityscapes/"
 BACKBONE="deepbase_resnet101_dilated8"
 
 CONFIGS="configs/cityscapes/R_101_D_8.json"
@@ -22,16 +24,16 @@ LOG_FILE="./log/cityscapes/${CHECKPOINTS_NAME}.log"
 echo "Logging to $LOG_FILE"
 mkdir -p `dirname $LOG_FILE`
 
-PRETRAINED_MODEL="/home/jc3/tfzhou/ContrastiveSeg/pretrained_model/resnet101-imagenet.pth"
+PRETRAINED_MODEL="./pretrained_model/resnet101-imagenet.pth"
 MAX_ITERS=40000
 
 
 if [ "$1"x == "train"x ]; then
-  python -u main.py --configs ${CONFIGS} \
+  ${PYTHON} -u main.py --configs ${CONFIGS} \
                        --drop_last y \
                        --phase train \
-                       --gathered y \
-                       --loss_balance n \
+                       --gathered n \
+                       --loss_balance y \
                        --log_to_file n \
                        --backbone ${BACKBONE} \
                        --model_name ${MODEL_NAME} \
@@ -41,6 +43,7 @@ if [ "$1"x == "train"x ]; then
                        --max_iters ${MAX_ITERS} \
                        --checkpoints_name ${CHECKPOINTS_NAME} \
                        --pretrained ${PRETRAINED_MODEL} \
+                       --distributed \
                        2>&1 | tee ${LOG_FILE}
                        
 
@@ -67,8 +70,7 @@ elif [ "$1"x == "val"x ]; then
                        --backbone ${BACKBONE} --model_name ${MODEL_NAME} --checkpoints_name ${CHECKPOINTS_NAME} \
                        --phase test --gpu 0 1 2 3 --resume ./checkpoints/cityscapes/${CHECKPOINTS_NAME}_latest.pth \
                        --loss_type ${LOSS_TYPE} --test_dir ${DATA_DIR}/val/image \
-                       --out_dir ${SAVE_DIR}${CHECKPOINTS_NAME}_val --data_dir ${DATA_DIR}
-
+                       --out_dir ${SAVE_DIR}${CHECKPOINTS_NAME}_val 
 
   cd lib/metrics
   ${PYTHON} -u cityscapes_evaluator.py --pred_dir ${SAVE_DIR}${CHECKPOINTS_NAME}_val/label  \

@@ -15,7 +15,7 @@ from __future__ import print_function
 
 import os
 import pdb
-from PIL import Image
+
 import numpy as np
 from torch.utils import data
 
@@ -26,16 +26,16 @@ from lib.utils.tools.logger import Logger as Log
 
 class DefaultLoader(data.Dataset):
     def __init__(self, root_dir, aug_transform=None, dataset=None,
-                 img_transform=None, torch_img_transform=None,
-                 label_transform=None, configer=None):
+                 img_transform=None, label_transform=None, configer=None):
         self.configer = configer
         self.aug_transform = aug_transform
         self.img_transform = img_transform
         self.label_transform = label_transform
-        self.torch_img_transform = torch_img_transform
         self.img_list, self.label_list, self.name_list = self.__list_dirs(root_dir, dataset)
         size_mode = self.configer.get(dataset, 'data_transformer')['size_mode']
         self.is_stack = size_mode != 'diverse_size'
+
+        Log.info('{} {}'.format(dataset, len(self.img_list)))
 
     def __len__(self):
         return len(self.img_list)
@@ -44,6 +44,7 @@ class DefaultLoader(data.Dataset):
         img = ImageHelper.read_image(self.img_list[index],
                                      tool=self.configer.get('data', 'image_tool'),
                                      mode=self.configer.get('data', 'input_mode'))
+        # Log.info('{}'.format(self.img_list[index]))
         img_size = ImageHelper.get_size(img)
         labelmap = ImageHelper.read_image(self.label_list[index],
                                           tool=self.configer.get('data', 'image_tool'), mode='P')
@@ -55,11 +56,6 @@ class DefaultLoader(data.Dataset):
 
         ori_target = ImageHelper.tonp(labelmap)
         ori_target[ori_target == 255] = -1
-
-        if self.torch_img_transform is not None:
-            img = Image.fromarray(img)
-            img = self.torch_img_transform(img)
-            img = np.array(img).astype(np.uint8)
 
         if self.aug_transform is not None:
             img, labelmap = self.aug_transform(img, labelmap=labelmap)
@@ -127,7 +123,7 @@ class DefaultLoader(data.Dataset):
         # support the argument to pass the file list used for training/testing
         file_list_txt = os.environ.get('use_file_list')
         if file_list_txt is None:
-            files = sorted(os.listdir(label_dir))
+            files = sorted(os.listdir(image_dir))
         else:
             Log.info("Using file list {} for training".format(file_list_txt))
             with open(os.path.join(root_dir, dataset, 'file_list', file_list_txt)) as f:
@@ -135,10 +131,11 @@ class DefaultLoader(data.Dataset):
 
         for file_name in files:
             image_name = '.'.join(file_name.split('.')[:-1])
-            img_path = os.path.join(image_dir, '{}.{}'.format(image_name, img_extension))
-            label_path = os.path.join(label_dir, file_name)
+            img_path = os.path.join(image_dir, '{}'.format(file_name))
+            label_path = os.path.join(label_dir, image_name + '.png')
+            # Log.info('{} {} {}'.format(image_name, img_path, label_path))
             if not os.path.exists(label_path) or not os.path.exists(img_path):
-                Log.error('Label Path: {} not exists.'.format(label_path))
+                Log.error('Label Path: {} {} not exists.'.format(label_path, img_path))
                 continue
 
             img_list.append(img_path)
@@ -164,7 +161,7 @@ class DefaultLoader(data.Dataset):
                 label_dir = os.path.join(root_dir, 'val/label_non_edge_void')
 
             if file_list_txt is None:
-                files = sorted(os.listdir(label_dir))
+                files = sorted(os.listdir(image_dir))
             else:
                 Log.info("Using file list {} for validation".format(file_list_txt))
                 with open(os.path.join(root_dir, 'val', 'file_list', file_list_txt)) as f:
@@ -172,10 +169,10 @@ class DefaultLoader(data.Dataset):
 
             for file_name in files:
                 image_name = '.'.join(file_name.split('.')[:-1])
-                img_path = os.path.join(image_dir, '{}.{}'.format(image_name, img_extension))
-                label_path = os.path.join(label_dir, file_name)
+                img_path = os.path.join(image_dir, '{}'.format(file_name))
+                label_path = os.path.join(label_dir, image_name + '.png')
                 if not os.path.exists(label_path) or not os.path.exists(img_path):
-                    Log.error('Label Path: {} not exists.'.format(label_path))
+                    Log.error('Label Path: {} {} not exists.'.format(label_path, img_path))
                     continue
 
                 img_list.append(img_path)
@@ -265,7 +262,7 @@ class CSDataTestLoader(data.Dataset):
     def __init__(self, root_dir, dataset=None, img_transform=None, configer=None):
         self.configer = configer
         self.img_transform = img_transform
-        self.img_list, self.name_list = self.__list_dirs(root_dir, dataset)
+        self.img_list, self.name_list, self.subfolder_list = self.__list_dirs(root_dir, dataset)
 
         size_mode = self.configer.get(dataset, 'data_transformer')['size_mode']
         self.is_stack = (size_mode != 'diverse_size')
@@ -288,15 +285,18 @@ class CSDataTestLoader(data.Dataset):
             img=DataContainer(img, stack=self.is_stack),
             meta=DataContainer(meta, stack=False, cpu_only=True),
             name=DataContainer(self.name_list[index], stack=False, cpu_only=True),
+            subfolder=DataContainer(self.subfolder_list[index], stack=False, cpu_only=True),
         )
 
     def __list_dirs(self, root_dir, dataset):
         img_list = list()
         name_list = list()
+        subfolder_list = list()
         image_dir = os.path.join(root_dir, dataset)
         img_extension = os.listdir(image_dir)[0].split('.')[-1]
 
-        if self.configer.get('dataset') == 'cityscapes':
+        if self.configer.get('dataset') == 'cityscapes' or self.configer.get('dataset') == 'camvid' or \
+                self.configer.get('dataset') == 'autonue21':
             for item in os.listdir(image_dir):
                 sub_image_dir = os.path.join(image_dir, item)
                 for file_name in os.listdir(sub_image_dir):
@@ -307,6 +307,7 @@ class CSDataTestLoader(data.Dataset):
                         continue
                     img_list.append(img_path)
                     name_list.append(image_name)
+                    subfolder_list.append(item)
         else:
              for file_name in os.listdir(image_dir):
                 image_name = file_name.split('.')[0]
@@ -315,9 +316,10 @@ class CSDataTestLoader(data.Dataset):
                     Log.error('Image Path: {} not exists.'.format(img_path))
                     continue
                 img_list.append(img_path)
-                name_list.append(image_name)           
+                name_list.append(image_name)
+                subfolder_list.append('')
 
-        return img_list, name_list
+        return img_list, name_list, subfolder_list
 
 if __name__ == "__main__":
     # Test cityscapes loader.

@@ -6,6 +6,10 @@
 > [Wenguan Wang](https://sites.google.com/view/wenguanwang/), [Tianfei Zhou](https://www.tfzhou.com/), [Fisher Yu](https://www.yf.io/), [Jifeng Dai](https://jifengdai.org/), [Ender Konukoglu](https://scholar.google.com/citations?user=OeEMrhQAAAAJ&hl=en) and [Luc Van Gool](https://scholar.google.com/citations?user=TwMib_QAAAAJ&hl=en) <br>
 > *arXiv technical report ([arXiv 2101.11939](https://arxiv.org/abs/2101.11939))*  
 
+## News
+
+* [2021-07-01] The codebase has been transferred from Pytorch-0.4.1 to Pytorch-1.7.1, which will be more easily for usage.
+
 ## Abstract
 
 Current semantic segmentation methods focus only on
@@ -29,13 +33,26 @@ This implementation is built on [openseg.pytorch](https://github.com/openseg-gro
 
 Please follow the [Getting Started](https://github.com/openseg-group/openseg.pytorch/blob/master/GETTING_STARTED.md) for installation and dataset preparation.
 
-## Running
+## Performance
 
-### Cityscapes
+### Cityscapes Dataset
 
-1.  Train ```DeepLabV3```
+| Backbone  | Train Set | Val Set | Iterations | Batch Size | Contrast Loss | Memory | mIoU  | Script |
+| --------- | --------- | ------- | ---------- | ---------- | ------------- | ------ | ----- | ----   |
+| HRNet-W48 | train     | val     | 40000      | 8          | N             | N      | 79.27 |```scripts/cityscapes/hrnet/run_h_48_d_4.sh```|
+| HRNet-W48 | train     | val     | 40000      | 8          | Y             | N      | 80.17 |```scripts/cityscapes/hrnet/run_h_48_d_4_contrast.sh```|
 
-    ```bash scripts/cityscapes/deeplab/run_r_101_d_8_deeplabv3_train_contrast.sh train 'resnet101-deeplabv3-contrast'```
+
+### Study of the temperature
+| Backbone  | Train Set | Val Set | Iterations | Batch Size | Temperature   | mIoU  |
+| --------- | --------- | ------- | ---------- | ---------- | ------------- | ----- |
+| HRNet-W48 | train     | val     | 40000      | 8          | 0.05          | 79.80 |
+| HRNet-W48 | train     | val     | 40000      | 8          | 0.07          | 79.59 |
+| HRNet-W48 | train     | val     | 40000      | 8          | 0.10          | 80.17 |
+| HRNet-W48 | train     | val     | 40000      | 8          | 0.20          | 80.01 |
+| HRNet-W48 | train     | val     | 40000      | 8          | 0.30          | 79.27 |
+| HRNet-W48 | train     | val     | 40000      | 8          | 0.40          | 79.40 |
+
 
 ## Features (in progress)
 

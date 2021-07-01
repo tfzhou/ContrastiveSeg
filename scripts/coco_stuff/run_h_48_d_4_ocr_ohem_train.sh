@@ -7,6 +7,8 @@ cd ../../
 # check the enviroment info
 nvidia-smi
 ${PYTHON} -m pip install yacs
+${PYTHON} -m pip install torchcontrib
+${PYTHON} -m pip install git+https://github.com/lucasb-eyer/pydensecrf.git
 
 export PYTHONPATH="$PWD":$PYTHONPATH
 
@@ -25,7 +27,7 @@ echo "Logging to $LOG_FILE"
 mkdir -p `dirname $LOG_FILE`
 PRETRAINED_MODEL="./pretrained_model/hrnetv2_w48_imagenet_pretrained.pth"
 MAX_ITERS=60000
-
+BATCH_SIZE=16
 
 if [ "$1"x == "train"x ]; then
   ${PYTHON} -u main.py --configs ${CONFIGS} \
@@ -37,12 +39,15 @@ if [ "$1"x == "train"x ]; then
                        --log_to_file n \
                        --backbone ${BACKBONE} \
                        --model_name ${MODEL_NAME} \
-                       --gpu 0 1 2 3 \
+                       --gpu 0 1 2 3 4 5 6 7 \
                        --data_dir ${DATA_DIR} \
                        --loss_type ${LOSS_TYPE} \
                        --max_iters ${MAX_ITERS} \
                        --checkpoints_name ${CHECKPOINTS_NAME} \
                        --pretrained ${PRETRAINED_MODEL} \
+                       --train_batch_size ${BATCH_SIZE} \
+                       --distributed \
+                       --test_interval ${MAX_ITERS} \
                        2>&1 | tee ${LOG_FILE}
                        
 

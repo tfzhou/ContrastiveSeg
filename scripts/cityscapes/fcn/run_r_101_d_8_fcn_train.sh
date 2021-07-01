@@ -8,7 +8,7 @@ nvidia-smi
 export PYTHONPATH="$PWD":$PYTHONPATH
 ${PYTHON} -m pip install yacs
 ${PYTHON} -m pip install torchcontrib
-${PYTHON} -m pip install pydensecrf
+${PYTHON} -m pip install git+https://github.com/lucasb-eyer/pydensecrf.git
 DATA_DIR="${DATA_ROOT}/cityscapes"
 SAVE_DIR="${DATA_ROOT}/seg_result/cityscapes/"
 BACKBONE="deepbase_resnet101_dilated8"
@@ -63,7 +63,7 @@ elif [ "$1"x == "resume"x ]; then
 
 
 elif [ "$1"x == "val"x ]; then
-  ${PYTHON} -u main.py --configs ${CONFIGS} --drop_last y --data_dir ${DATA_DIR} \
+  ${PYTHON} -u main.py --configs ${CONFIGS} --drop_last y \
                        --backbone ${BACKBONE} --model_name ${MODEL_NAME} --checkpoints_name ${CHECKPOINTS_NAME} \
                        --phase test --gpu 0 1 2 3 --resume ./checkpoints/cityscapes/${CHECKPOINTS_NAME}_latest.pth \
                        --loss_type ${LOSS_TYPE} --test_dir ${DATA_DIR}/val/image \

@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from lib.loss.loss_helper import FSAuxCELoss, FSAuxRMILoss
+from lib.loss.loss_helper import FSAuxCELoss, FSAuxRMILoss, FSCELoss
 from lib.utils.tools.logger import Logger as Log
 
 
@@ -35,7 +35,7 @@ class PixelContrastLoss(nn.Module, ABC):
         for ii in range(batch_size):
             this_y = y_hat[ii]
             this_classes = torch.unique(this_y)
-            this_classes = [x for x in this_classes if x > 0 and x != self.ignore_label]
+            this_classes = [x for x in this_classes if x != self.ignore_label]
             this_classes = [x for x in this_classes if (this_y == x).nonzero().shape[0] > self.max_views]
 
             classes.append(this_classes)
@@ -144,8 +144,49 @@ class PixelContrastLoss(nn.Module, ABC):
         feats_, labels_ = self._hard_anchor_sampling(feats, labels, predict)
 
         loss = self._contrastive(feats_, labels_)
-
         return loss
+
+
+class ContrastCELoss(nn.Module, ABC):
+    def __init__(self, configer=None):
+        super(ContrastCELoss, self).__init__()
+
+        self.configer = configer
+
+        ignore_index = -1
+        if self.configer.exists('loss', 'params') and 'ce_ignore_index' in self.configer.get('loss', 'params'):
+            ignore_index = self.configer.get('loss', 'params')['ce_ignore_index']
+        Log.info('ignore_index: {}'.format(ignore_index))
+
+        self.loss_weight = self.configer.get('contrast', 'loss_weight')
+        self.use_rmi = self.configer.get('contrast', 'use_rmi')
+
+        if self.use_rmi:
+            self.seg_criterion = FSAuxRMILoss(configer=configer)
+        else:
+            self.seg_criterion = FSCELoss(configer=configer)
+
+        self.contrast_criterion = PixelContrastLoss(configer=configer)
+
+    def forward(self, preds, target, with_embed=False):
+        h, w = target.size(1), target.size(2)
+
+        assert "seg" in preds
+        assert "embed" in preds
+
+        seg = preds['seg']
+        embedding = preds['embed']
+
+        pred = F.interpolate(input=seg, size=(h, w), mode='bilinear', align_corners=True)
+        loss = self.seg_criterion(pred, target)
+
+        _, predict = torch.max(seg, 1)
+        loss_contrast = self.contrast_criterion(embedding, target, predict)
+
+        if with_embed is True:
+            return loss + self.loss_weight * loss_contrast
+
+        return loss + 0 * loss_contrast  # just a trick to avoid errors in distributed training
 
 
 class ContrastAuxCELoss(nn.Module, ABC):

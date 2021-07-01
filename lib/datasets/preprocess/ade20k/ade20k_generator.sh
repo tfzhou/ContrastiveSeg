@@ -4,8 +4,8 @@
 # Generate train & val data.
 
 
-ORI_ROOT_DIR='/home/donny/DataSet/ADE20K'
-SAVE_DIR='/home/donny/DataSet/ADE20K'
+ORI_ROOT_DIR='/cluster/work/cvl/tiazhou/data/ADE20K/ADEChallengeData2016'
+SAVE_DIR='/cluster/work/cvl/tiazhou/data/ADE20K/ADEChallengeData2016'
 
 
 python ade20k_generator.py --ori_root_dir $ORI_ROOT_DIR \

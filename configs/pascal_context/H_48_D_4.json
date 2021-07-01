@@ -20,7 +20,7 @@
     },
     "val": {
       "batch_size": 4,
-      "mode": "ms_test",
+      "mode": "ss_test",
       "data_transformer": {
         "size_mode": "diverse_size",
         "align_method": "only_pad",
@@ -92,7 +92,7 @@
     "network":{
       "backbone": "deepbase_resnet101_dilated8",
       "model_name": "asp_ocnet",
-      "bn_type": "inplace_abn",
+      "bn_type": "torchsyncbn",
       "stride": 8,
       "factors": [[8, 8]],
       "loss_weights": {
@@ -146,5 +146,16 @@
         "ohem_minkeep":100000,
         "ohem_thresh": 0.7
       }
+    },
+    "contrast": {
+      "proj_dim": 256,
+      "temperature": 0.07,
+      "base_temperature": 0.07,
+      "max_samples": 1024,
+      "max_views": 100,
+      "stride": 8,
+      "warmup_iters": 5000,
+      "loss_weight": 0.1,
+      "use_rmi": false
     }
 }

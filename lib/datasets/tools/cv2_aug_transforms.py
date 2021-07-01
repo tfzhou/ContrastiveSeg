@@ -17,8 +17,8 @@ import numpy as np
 from lib.utils.tools.logger import Logger as Log
 from lib.datasets.tools.transforms import DeNormalize
 
-class _BaseTransform(object):
 
+class _BaseTransform(object):
     DATA_ITEMS = (
         'labelmap', 'maskmap',
         'distance_map', 'angle_map', 'multi_label_direction_map',
@@ -81,12 +81,12 @@ class Padding(_BaseTransform):
         ), dtype=x.dtype)
         expand_x[:, :] = pad_value
         expand_x[
-            abs(min(offset_up, 0)):abs(min(offset_up, 0)) + height,
-            abs(min(offset_left, 0)):abs(min(offset_left, 0)) + width] = x
+        abs(min(offset_up, 0)):abs(min(offset_up, 0)) + height,
+        abs(min(offset_left, 0)):abs(min(offset_left, 0)) + width] = x
         x = expand_x[
             max(offset_up, 0):max(offset_up, 0) + target_size[1],
             max(offset_left, 0):max(offset_left, 0) + target_size[0]
-        ]
+            ]
         return x
 
     def _process_img(self, img, *args):
@@ -423,12 +423,12 @@ class RandomResize(_BaseTransform):
             scale_ratio = self.get_scale([width, height])
         else:
             scale_ratio = self.scale_list[random.randint(
-                0, len(self.scale_list)-1)]
+                0, len(self.scale_list) - 1)]
 
         aspect_ratio = random.uniform(*self.aspect_range)
         w_scale_ratio = math.sqrt(aspect_ratio) * scale_ratio
         h_scale_ratio = math.sqrt(1.0 / aspect_ratio) * scale_ratio
-        if self.max_side_bound is not None and max(height*h_scale_ratio, width*w_scale_ratio) > self.max_side_bound:
+        if self.max_side_bound is not None and max(height * h_scale_ratio, width * w_scale_ratio) > self.max_side_bound:
             d_ratio = self.max_side_bound / max(height * h_scale_ratio, width * w_scale_ratio)
             w_scale_ratio *= d_ratio
             h_scale_ratio *= d_ratio
@@ -450,7 +450,7 @@ class RandomRotate(_BaseTransform):
     """
 
     def __init__(self, max_degree, rotate_ratio=0.5, mean=(104, 117, 123)):
-        assert isinstance(max_degree, int)
+        assert isinstance(max_degree, int), '{}'.format(type(max_degree))
         self.max_degree = max_degree
         self.ratio = rotate_ratio
         self.mean = mean
@@ -697,7 +697,7 @@ class CV2AugCompose(object):
                 choose_this = True
                 for cond_key, cond_value in spec['when'].items():
                     choose_this = choose_this and (
-                        config[cond_key] == cond_value)
+                            config[cond_key] == cond_value)
                 if choose_this:
                     break
             else:

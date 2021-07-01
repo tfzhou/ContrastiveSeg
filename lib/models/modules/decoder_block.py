@@ -84,6 +84,69 @@ class ASPPModule(nn.Module):
         out = torch.cat((feat0, feat1, feat2, feat3, feat4), dim=1)
         return self.project(out)
 
+class DeepLabHead_MobileNet_V1(nn.Module):
+    """Segmentation head based on DeepLab v3"""
+
+    def __init__(self, num_classes, bn_type=None):
+        super(DeepLabHead_MobileNet_V1, self).__init__()
+        # main pipeline
+        self.layer_aspp = ASPPModule(1024, 512, bn_type=bn_type)
+        self.refine = nn.Sequential(nn.Conv2d(512, 512, kernel_size=3,
+                                              padding=1, stride=1, bias=False),
+                                    ModuleHelper.BatchNorm2d(bn_type=bn_type)(512),
+                                    nn.Conv2d(512, num_classes, kernel_size=1,
+                                              stride=1, bias=True))
+
+    def forward(self, x):
+        # aspp module
+        x_aspp = self.layer_aspp(x)
+        # refine module
+        x_seg = self.refine(x_aspp)
+
+        return x_seg
+
+class DeepLabHead_MobileNet_V3(nn.Module):
+    """Segmentation head based on DeepLab v3"""
+
+    def __init__(self, num_classes, bn_type=None):
+        super(DeepLabHead_MobileNet_V3, self).__init__()
+        # main pipeline
+        self.layer_aspp = ASPPModule(960, 512, bn_type=bn_type)
+        self.refine = nn.Sequential(nn.Conv2d(512, 512, kernel_size=3,
+                                              padding=1, stride=1, bias=False),
+                                    ModuleHelper.BatchNorm2d(bn_type=bn_type)(512),
+                                    nn.Conv2d(512, num_classes, kernel_size=1,
+                                              stride=1, bias=True))
+
+    def forward(self, x):
+        # aspp module
+        x_aspp = self.layer_aspp(x)
+        # refine module
+        x_seg = self.refine(x_aspp)
+
+        return x_seg
+
+class DeepLabHead_MobileNet(nn.Module):
+    """Segmentation head based on DeepLab v3"""
+
+    def __init__(self, num_classes, bn_type=None):
+        super(DeepLabHead_MobileNet, self).__init__()
+        # main pipeline
+        self.layer_aspp = ASPPModule(1280, 512, bn_type=bn_type)
+        self.refine = nn.Sequential(nn.Conv2d(512, 512, kernel_size=3,
+                                              padding=1, stride=1, bias=False),
+                                    ModuleHelper.BatchNorm2d(bn_type=bn_type)(512),
+                                    nn.Conv2d(512, num_classes, kernel_size=1,
+                                              stride=1, bias=True))
+
+    def forward(self, x):
+        # aspp module
+        x_aspp = self.layer_aspp(x)
+        # refine module
+        x_seg = self.refine(x_aspp)
+
+        return x_seg
+
 
 class DeepLabHead(nn.Module):
     """Segmentation head based on DeepLab v3"""

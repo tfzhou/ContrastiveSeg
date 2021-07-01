@@ -2,19 +2,14 @@
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 cd $SCRIPTPATH
 cd ../../
-. config.profile
 
-# check the enviroment info
-nvidia-smi
 
-${PYTHON} -m pip install yacs
-${PYTHON} -m pip install torchcontrib
-${PYTHON} -m pip install pydensecrf
+DATA_ROOT=$3
+SCRATCH_ROOT=$4
+ASSET_ROOT=${DATA_ROOT}
 
-export PYTHONPATH="$PWD":$PYTHONPATH
-
-DATA_DIR="${DATA_ROOT}/pascal_context"
-SAVE_DIR="${DATA_ROOT}/seg_result/pascal_context/"
+DATA_DIR="${DATA_ROOT}/pascalcontext"
+SAVE_DIR="${SCRATCH_ROOT}/seg_results/pascal_context/"
 BACKBONE="deepbase_resnet101_dilated8"
 
 CONFIGS="configs/pascal_context/R_101_D_8.json"

@@ -6,7 +6,7 @@ from lib.utils.tools.logger import Logger as Log
 
 
 class ProjectionHead(nn.Module):
-    def __init__(self, dim_in, proj_dim=256, proj='convmlp', bn_type='inplace_abn'):
+    def __init__(self, dim_in, proj_dim=256, proj='convmlp', bn_type='torchsyncbn'):
         super(ProjectionHead, self).__init__()
 
         Log.info('proj_dim: {}'.format(proj_dim))

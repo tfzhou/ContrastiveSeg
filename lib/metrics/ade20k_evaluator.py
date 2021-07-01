@@ -18,7 +18,7 @@ from lib.metrics.running_score import RunningScore
 class ADE20KEvaluator(object):
     def __init__(self, configer):
         self.configer = configer
-        self.seg_running_score = RunningScore(configer)
+        self.seg_running_score = RunningScore(configer, ignore_index=255)
 
     def relabel(self, labelmap):
         return (labelmap - 1).astype(np.uint8)
@@ -26,8 +26,6 @@ class ADE20KEvaluator(object):
     def evaluate(self, pred_dir, gt_dir):
         img_cnt = 0
         for filename in os.listdir(pred_dir):
-            print(filename)
-            
             pred_path = os.path.join(pred_dir, filename)
             gt_path = os.path.join(gt_dir, filename)
             predmap = ImageHelper.img2np(ImageHelper.read_image(pred_path, tool='pil', mode='P'))
@@ -37,15 +35,16 @@ class ADE20KEvaluator(object):
                 predmap = self.relabel(predmap)
                 gtmap = self.relabel(gtmap)
 
-            if "coco_stuff" in gt_dir:
-                gtmap[gtmap == 0] = 255 
-                
+            if "coco_stuff" in gt_dir or "woodscape" in gt_dir:
+                gtmap[gtmap == 0] = 255
+
             self.seg_running_score.update(predmap[np.newaxis, :, :], gtmap[np.newaxis, :, :])
             img_cnt += 1
 
         Log.info('Evaluate {} images'.format(img_cnt))
         Log.info('mIOU: {}'.format(self.seg_running_score.get_mean_iou()))
         Log.info('Pixel ACC: {}'.format(self.seg_running_score.get_pixel_acc()))
+        Log.info('Class mIOU: {}'.format(self.seg_running_score.get_cls_iou()))
 
 
 if __name__ == "__main__":

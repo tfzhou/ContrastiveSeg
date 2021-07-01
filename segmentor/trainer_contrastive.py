@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import sys
 import time
 
 import torch
@@ -84,6 +85,58 @@ class Trainer(object):
         Log.info("with_contrast: {}, warmup_iters: {}, with_memory: {}".format(
             self.with_contrast, self.contrast_warmup_iters, self.with_memory))
 
+        # self.experiment = keepsake.init(
+        #     path='keepsake',
+        #     params={"[HP] learning_rate": self.configer.get('lr', 'base_lr'),
+        #             "[HP] train_bs": self.configer.get('train', 'batch_size'),
+        #             "[NET] loss": self.configer.get('loss', 'loss_type'),
+        #             "[NET] backbone": self.configer.get('network', 'backbone'),
+        #             "[NET] model_name": self.configer.get('network', 'model_name'),
+        #             "[CONTRAST] proj_dim": self.configer.get('contrast', 'proj_dim'),
+        #             "[CONTRAST] temperature": self.configer.get('contrast', 'temperature'),
+        #             "[CONTRAST] max_samples": self.configer.get('contrast', 'max_samples'),
+        #             "[CONTRAST] warmup_iters": self.configer.get('contrast', 'warmup_iters'),
+        #             "[CONTRAST] loss_weight": self.configer.get('contrast', 'loss_weight')}
+        # )
+
+    def _dequeue_and_enqueue(self, keys, labels,
+                             segment_queue, segment_queue_ptr,
+                             pixel_queue, pixel_queue_ptr):
+        batch_size = keys.shape[0]
+        feat_dim = keys.shape[1]
+
+        labels = labels[:, ::self.network_stride, ::self.network_stride]
+
+        for bs in range(batch_size):
+            this_feat = keys[bs].contiguous().view(feat_dim, -1)
+            this_label = labels[bs].contiguous().view(-1)
+            this_label_ids = torch.unique(this_label)
+            this_label_ids = [x for x in this_label_ids if x > 0]
+
+            for lb in this_label_ids:
+                idxs = (this_label == lb).nonzero()
+
+                # segment enqueue and dequeue
+                feat = torch.mean(this_feat[:, idxs], dim=1).squeeze(1)
+                ptr = int(segment_queue_ptr[lb])
+                segment_queue[lb, ptr, :] = nn.functional.normalize(feat.view(-1), p=2, dim=0)
+                segment_queue_ptr[lb] = (segment_queue_ptr[lb] + 1) % self.memory_size
+
+                # pixel enqueue and dequeue
+                num_pixel = idxs.shape[0]
+                perm = torch.randperm(num_pixel)
+                K = min(num_pixel, self.pixel_update_freq)
+                feat = this_feat[:, perm[:K]]
+                feat = torch.transpose(feat, 0, 1)
+                ptr = int(pixel_queue_ptr[lb])
+
+                if ptr + K >= self.memory_size:
+                    pixel_queue[lb, -K:, :] = nn.functional.normalize(feat, p=2, dim=1)
+                    pixel_queue_ptr[lb] = 0
+                else:
+                    pixel_queue[lb, ptr:ptr + K, :] = nn.functional.normalize(feat, p=2, dim=1)
+                    pixel_queue_ptr[lb] = (pixel_queue_ptr[lb] + 1) % self.memory_size
+
     @staticmethod
     def group_weight(module):
         group_decay = []
@@ -153,10 +206,15 @@ class Trainer(object):
 
             foward_start_time = time.time()
 
+            with_embed = True if self.configer.get('iters') >= self.contrast_warmup_iters else False
             if self.with_contrast is True:
-                with_embed = True if self.configer.get('iters') >= self.contrast_warmup_iters else False
                 if self.with_memory is True:
                     outputs = self.seg_net(*inputs, targets, with_embed=with_embed)
+
+                    outputs['pixel_queue'] = self.seg_net.module.pixel_queue
+                    outputs['pixel_queue_ptr'] = self.seg_net.module.pixel_queue_ptr
+                    outputs['segment_queue'] = self.seg_net.module.segment_queue
+                    outputs['segment_queue_ptr'] = self.seg_net.module.segment_queue_ptr
                 else:
                     outputs = self.seg_net(*inputs, with_embed=with_embed)
             else:
@@ -180,11 +238,18 @@ class Trainer(object):
                         dist.reduce(reduced_inp, dst=0)
                     return reduced_inp
 
-                loss = self.pixel_loss(outputs, targets)
+                loss = self.pixel_loss(outputs, targets, with_embed=with_embed)
                 backward_loss = loss
                 display_loss = reduce_tensor(backward_loss) / get_world_size()
             else:
                 backward_loss = display_loss = self.pixel_loss(outputs, targets)
+
+            if self.with_memory and 'key' in outputs and 'lb_key' in outputs:
+                self._dequeue_and_enqueue(outputs['key'], outputs['lb_key'],
+                                          segment_queue=self.seg_net.module.segment_queue,
+                                          segment_queue_ptr=self.seg_net.module.segment_queue_ptr,
+                                          pixel_queue=self.seg_net.module.pixel_queue,
+                                          pixel_queue_ptr=self.seg_net.module.pixel_queue_ptr)
 
             self.train_losses.update(display_loss.item(), batch_size)
             self.loss_time.update(time.time() - loss_start_time)
@@ -192,6 +257,7 @@ class Trainer(object):
             backward_start_time = time.time()
             self.optimizer.zero_grad()
             backward_loss.backward()
+
             self.optimizer.step()
             self.backward_time.update(time.time() - backward_start_time)
 
@@ -280,17 +346,19 @@ class Trainer(object):
                     self.evaluator.update_score(outputs, data_dict['meta'])
 
                 elif self.data_helper.conditions.diverse_size:
-                    outputs = nn.parallel.parallel_apply(replicas[:len(inputs)], inputs)
+                    if is_distributed():
+                        outputs = [self.seg_net(inputs[i]) for i in range(len(inputs))]
+                    else:
+                        outputs = nn.parallel.parallel_apply(replicas[:len(inputs)], inputs)
 
                     for i in range(len(outputs)):
-                        loss = self.pixel_loss(outputs[i], targets[i])
+                        loss = self.pixel_loss(outputs[i], targets[i].unsqueeze(0))
                         self.val_losses.update(loss.item(), 1)
-                        outputs_i = outputs[i]
+                        outputs_i = outputs[i]['seg']
                         if isinstance(outputs_i, torch.Tensor):
                             outputs_i = [outputs_i]
-                        if isinstance(outputs_i, dict):
-                            outputs_i = [outputs_i['seg']]
                         self.evaluator.update_score(outputs_i, data_dict['meta'][i:i + 1])
+
                 else:
                     outputs = self.seg_net(*inputs, is_eval=True)
 
@@ -314,8 +382,8 @@ class Trainer(object):
         self.evaluator.update_performance()
 
         self.configer.update(['val_loss'], self.val_losses.avg)
-        self.module_runner.save_net(self.seg_net, save_mode='performance')
-        self.module_runner.save_net(self.seg_net, save_mode='val_loss')
+        self.module_runner.save_net(self.seg_net, save_mode='performance', experiment=self.experiment)
+        self.module_runner.save_net(self.seg_net, save_mode='val_loss', experiment=self.experiment)
         cudnn.benchmark = True
 
         # Print the log info & reset the states.

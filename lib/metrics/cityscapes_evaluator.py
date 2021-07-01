@@ -19,7 +19,10 @@ except ImportError:
     izip = zip
 
 # Cityscapes imports
-from lib.metrics.cityscapes.evaluation.csHelpers import *
+try:
+    from lib.metrics.cityscapes.evaluation.csHelpers import *
+except:
+    from cityscapes.evaluation.csHelpers import *
 
 # C Support
 # Enable the cython support for faster evaluation, this is necessary for speeding up your model results

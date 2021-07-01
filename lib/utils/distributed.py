@@ -3,6 +3,8 @@ import torch.nn as nn
 import subprocess
 import sys
 import os
+from lib.utils.tools.logger import Logger as Log
+
 
 def is_distributed():
     return torch.distributed.is_initialized()
@@ -16,6 +18,11 @@ def get_rank():
     if not torch.distributed.is_initialized():
         return 0
     return torch.distributed.get_rank()
+
+def all_reduce_numpy(array):
+    tensor = torch.from_numpy(array).cuda()
+    torch.distributed.all_reduce(tensor)
+    return tensor.cpu().numpy()
 
 def handle_distributed(args, main_file):
     if not args.distributed:
@@ -39,13 +46,19 @@ def handle_distributed(args, main_file):
     # Logic for spawner
     python_exec = sys.executable
     command_args = sys.argv
-    main_index = command_args.index('main.py')
+    Log.info('{}'.format(command_args))
+    try:
+        main_index = command_args.index('main_contrastive.py')
+    except:
+        main_index = command_args.index('main.py')
+
     command_args = command_args[main_index+1:]
     print(command_args)
     command_args = [
         python_exec, '-u',
         '-m', 'torch.distributed.launch',
         '--nproc_per_node', str(world_size),
+        '--master_port', str(29961),
         main_file,
     ] + command_args
     process = subprocess.Popen(command_args, env=current_env)
@@ -62,5 +75,5 @@ def _setup_process_group(args):
     torch.distributed.init_process_group(
         'nccl',
         init_method='env://',
-        rank=local_rank
+        # rank=local_rank
     )

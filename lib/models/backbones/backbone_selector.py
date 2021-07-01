@@ -15,6 +15,13 @@ from __future__ import print_function
 
 from lib.models.backbones.resnet.resnet_backbone import ResNetBackbone
 from lib.models.backbones.hrnet.hrnet_backbone import HRNetBackbone
+from lib.models.backbones.pvt.pvt_backbone import PVTBackbone
+from lib.models.backbones.pvt.pcpvt_backbone import PCPVTBackbone
+from lib.models.backbones.pvt.svt_backbone import SVTBackbone
+from lib.models.backbones.mobilenet.mobilenet_v1 import MobileNetV1Backbone
+from lib.models.backbones.mobilenet.mobilenet_v2 import MobileNetV2Backbone
+from lib.models.backbones.mobilenet.mobilenet_v3 import MobileNetV3Backbone
+
 from lib.utils.tools.logger import Logger as Log
 
 
@@ -32,6 +39,22 @@ class BackboneSelector(object):
 
         elif 'hrne' in backbone:
             model = HRNetBackbone(self.configer)(**params)
+
+        elif 'pcpvt' in backbone:
+            model = PCPVTBackbone(self.configer)(**params)
+
+        elif 'pvt' in backbone:
+            model = PVTBackbone(self.configer)(**params)
+
+        elif 'svt' in backbone:
+            model = SVTBackbone(self.configer)(**params)
+
+        elif 'mobilenet_v1' in backbone:
+            model = MobileNetV1Backbone(self.configer)(**params)
+        elif 'mobilenet_v2' in backbone:
+            model = MobileNetV2Backbone(self.configer)(**params)
+        elif 'mobilenet_v3' in backbone:
+            model = MobileNetV3Backbone(self.configer)(**params)
 
         else:
             Log.error('Backbone {} is invalid.'.format(backbone))

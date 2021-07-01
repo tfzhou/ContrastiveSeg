@@ -36,6 +36,7 @@ from segmentor.tools.optim_scheduler import OptimScheduler
 from segmentor.tools.data_helper import DataHelper
 from segmentor.tools.evaluator import get_evaluator
 from lib.utils.distributed import get_world_size, get_rank, is_distributed
+# from mmcv.cnn import get_model_complexity_info
 
 
 class Trainer(object):
@@ -72,6 +73,18 @@ class Trainer(object):
 
     def _init_model(self):
         self.seg_net = self.model_manager.semantic_segmentor()
+
+        try:
+            flops, params = get_model_complexity_info(self.seg_net, (3, 512, 512))
+            split_line = '=' * 30
+            print('{0}\nInput shape: {1}\nFlops: {2}\nParams: {3}\n{0}'.format(
+                split_line, (3, 512, 512), flops, params))
+            print('!!!Please be cautious if you use the results in papers. '
+                  'You may need to check if all ops are supported and verify that the '
+                  'flops computation is correct.')
+        except:
+            pass
+
         self.seg_net = self.module_runner.load_net(self.seg_net)
 
         Log.info('Params Group Method: {}'.format(self.configer.get('optim', 'group_method')))
@@ -115,14 +128,18 @@ class Trainer(object):
     def _get_parameters(self):
         bb_lr = []
         nbb_lr = []
+        fcn_lr = []
         params_dict = dict(self.seg_net.named_parameters())
         for key, value in params_dict.items():
-            if 'backbone' not in key:
-                nbb_lr.append(value)
-            else:
+            if 'backbone' in key:
                 bb_lr.append(value)
+            elif 'aux_layer' in key or 'upsample_proj' in key:
+                fcn_lr.append(value)
+            else:
+                nbb_lr.append(value)
 
         params = [{'params': bb_lr, 'lr': self.configer.get('lr', 'base_lr')},
+                  {'params': fcn_lr, 'lr': self.configer.get('lr', 'base_lr') * 10},
                   {'params': nbb_lr, 'lr': self.configer.get('lr', 'base_lr') * self.configer.get('lr', 'nbb_mult')}]
         return params
 
@@ -133,6 +150,7 @@ class Trainer(object):
         self.seg_net.train()
         self.pixel_loss.train()
         start_time = time.time()
+        scaler = torch.cuda.amp.GradScaler()
 
         if "swa" in self.configer.get('lr', 'lr_policy'):
             normal_max_iters = int(self.configer.get('solver', 'max_iters') * 0.75)
@@ -142,6 +160,7 @@ class Trainer(object):
             self.train_loader.sampler.set_epoch(self.configer.get('epoch'))
 
         for i, data_dict in enumerate(self.train_loader):
+            self.optimizer.zero_grad()
             if self.configer.get('lr', 'metric') == 'iters':
                 self.scheduler.step(self.configer.get('iters'))
             else:
@@ -157,7 +176,8 @@ class Trainer(object):
             self.data_time.update(time.time() - start_time)
 
             foward_start_time = time.time()
-            outputs = self.seg_net(*inputs)
+            with torch.cuda.amp.autocast():
+                outputs = self.seg_net(*inputs)
             self.foward_time.update(time.time() - foward_start_time)
 
             loss_start_time = time.time()
@@ -176,19 +196,25 @@ class Trainer(object):
                         dist.reduce(reduced_inp, dst=0)
                     return reduced_inp
 
-                loss = self.pixel_loss(outputs, targets)
-                backward_loss = loss
-                display_loss = reduce_tensor(backward_loss) / get_world_size()
+                with torch.cuda.amp.autocast():
+                    loss = self.pixel_loss(outputs, targets)
+                    backward_loss = loss
+                    display_loss = reduce_tensor(backward_loss) / get_world_size()
             else:
-                backward_loss = display_loss = self.pixel_loss(outputs, targets)
+                backward_loss = display_loss = self.pixel_loss(outputs, targets,
+                                                               gathered=self.configer.get('network', 'gathered'))
 
             self.train_losses.update(display_loss.item(), batch_size)
             self.loss_time.update(time.time() - loss_start_time)
 
             backward_start_time = time.time()
-            self.optimizer.zero_grad()
-            backward_loss.backward()
-            self.optimizer.step()
+
+            # backward_loss.backward()
+            # self.optimizer.step()
+            scaler.scale(backward_loss).backward()
+            scaler.step(self.optimizer)
+            scaler.update()
+
             self.backward_time.update(time.time() - backward_start_time)
 
             # Update the vars of the train phase.
@@ -247,6 +273,7 @@ class Trainer(object):
         data_loader = self.val_loader if data_loader is None else data_loader
         for j, data_dict in enumerate(data_loader):
             if j % 10 == 0:
+                if is_distributed(): dist.barrier()  # Synchronize all processes
                 Log.info('{} images processed\n'.format(j))
 
             if self.configer.get('dataset') == 'lip':
@@ -259,7 +286,10 @@ class Trainer(object):
                 if self.configer.get('dataset') == 'lip':
                     inputs = torch.cat([inputs[0], inputs_rev[0]], dim=0)
                     outputs = self.seg_net(inputs)
-                    outputs_ = self.module_runner.gather(outputs)
+                    if not is_distributed():
+                        outputs_ = self.module_runner.gather(outputs)
+                    else:
+                        outputs_ = outputs
                     if isinstance(outputs_, (list, tuple)):
                         outputs_ = outputs_[-1]
                     outputs = outputs_[0:int(outputs_.size(0) / 2), :, :, :].clone()
@@ -276,10 +306,13 @@ class Trainer(object):
                     self.evaluator.update_score(outputs, data_dict['meta'])
 
                 elif self.data_helper.conditions.diverse_size:
-                    outputs = nn.parallel.parallel_apply(replicas[:len(inputs)], inputs)
+                    if is_distributed():
+                        outputs = [self.seg_net(inputs[i]) for i in range(len(inputs))]
+                    else:
+                        outputs = nn.parallel.parallel_apply(replicas[:len(inputs)], inputs)
 
                     for i in range(len(outputs)):
-                        loss = self.pixel_loss(outputs[i], targets[i])
+                        loss = self.pixel_loss(outputs[i], targets[i].unsqueeze(0))
                         self.val_losses.update(loss.item(), 1)
                         outputs_i = outputs[i]
                         if isinstance(outputs_i, torch.Tensor):
@@ -301,9 +334,11 @@ class Trainer(object):
                         outputs = self.module_runner.gather(outputs)
                     self.val_losses.update(loss.item(), batch_size)
                     if isinstance(outputs, dict):
-                        self.evaluator.update_score(outputs['seg'], data_dict['meta'])
-                    else:
-                        self.evaluator.update_score(outputs, data_dict['meta'])
+                        try:
+                            outputs = outputs['pred']
+                        except:
+                            outputs = outputs['seg']
+                    self.evaluator.update_score(outputs, data_dict['meta'])
 
             self.batch_time.update(time.time() - start_time)
             start_time = time.time()
@@ -316,6 +351,7 @@ class Trainer(object):
         cudnn.benchmark = True
 
         # Print the log info & reset the states.
+        self.evaluator.reduce_scores()
         if not is_distributed() or get_rank() == 0:
             Log.info(
                 'Test Time {batch_time.sum:.3f}s, ({batch_time.avg:.3f})\t'

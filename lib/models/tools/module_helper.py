@@ -20,6 +20,7 @@ except ImportError:
     from urllib.request import urlretrieve
 
 from lib.utils.tools.logger import Logger as Log
+from torch.nn.functional import interpolate
 
 
 class ModuleHelper(object):
@@ -90,7 +91,7 @@ class ModuleHelper(object):
             return SwitchNorm2d
 
         elif bn_type == 'gn':
-            return functools.partial(nn.GroupNorm, num_groups=32)    
+            return functools.partial(nn.GroupNorm, num_groups=32)
 
         elif bn_type == 'inplace_abn':
             torch_ver = torch.__version__[:3]
@@ -106,8 +107,8 @@ class ModuleHelper(object):
                 if ret_cls:
                     return InPlaceABNSync
 
-                return functools.partial(InPlaceABNSync, activation='none')  
-                          
+                return functools.partial(InPlaceABNSync, activation='none')
+
             elif torch_ver == '1.2':
                 from inplace_abn import InPlaceABNSync
                 if ret_cls:
@@ -126,7 +127,7 @@ class ModuleHelper(object):
 
         if all_match:
             Log.info('Loading pretrained model:{}'.format(pretrained))
-            pretrained_dict = torch.load(pretrained)
+            pretrained_dict = torch.load(pretrained, map_location=lambda storage, loc: storage)
             model_dict = model.state_dict()
             load_dict = dict()
             for k, v in pretrained_dict.items():
@@ -138,21 +139,69 @@ class ModuleHelper(object):
 
         else:
             Log.info('Loading pretrained model:{}'.format(pretrained))
-            pretrained_dict = torch.load(pretrained)
+            pretrained_dict = torch.load(pretrained, map_location=lambda storage, loc: storage)
 
             # settings for "wide_resnet38"  or network == "resnet152"
             if network == "wide_resnet":
                 pretrained_dict = pretrained_dict['state_dict']
-                
+
             model_dict = model.state_dict()
 
             if network == "hrnet_plus":
                 # pretrained_dict['conv1_full_res.weight'] = pretrained_dict['conv1.weight']
                 # pretrained_dict['conv2_full_res.weight'] = pretrained_dict['conv2.weight']
-                load_dict = {k : v for k, v in pretrained_dict.items() if k in model_dict.keys()}
+                load_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict.keys()}
+
+            elif network == 'pvt':
+                pretrained_dict = {k: v for k, v in pretrained_dict.items() if
+                                   k in model_dict.keys()}
+                pretrained_dict['pos_embed1'] = \
+                    interpolate(pretrained_dict['pos_embed1'].unsqueeze(dim=0), size=[16384, 64])[0]
+                pretrained_dict['pos_embed2'] = \
+                    interpolate(pretrained_dict['pos_embed2'].unsqueeze(dim=0), size=[4096, 128])[0]
+                pretrained_dict['pos_embed3'] = \
+                    interpolate(pretrained_dict['pos_embed3'].unsqueeze(dim=0), size=[1024, 320])[0]
+                pretrained_dict['pos_embed4'] = \
+                    interpolate(pretrained_dict['pos_embed4'].unsqueeze(dim=0), size=[256, 512])[0]
+                pretrained_dict['pos_embed7'] = \
+                    interpolate(pretrained_dict['pos_embed1'].unsqueeze(dim=0), size=[16384, 64])[0]
+                pretrained_dict['pos_embed6'] = \
+                    interpolate(pretrained_dict['pos_embed2'].unsqueeze(dim=0), size=[4096, 128])[0]
+                pretrained_dict['pos_embed5'] = \
+                    interpolate(pretrained_dict['pos_embed3'].unsqueeze(dim=0), size=[1024, 320])[0]
+                load_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict.keys()}
+
+            elif network == 'pcpvt' or network == 'svt':
+                load_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict.keys()}
+                Log.info('Missing keys: {}'.format(list(set(model_dict) - set(load_dict))))
+
+            elif network == 'transunet_swin':
+                pretrained_dict = {k: v for k, v in pretrained_dict.items() if
+                                   k in model_dict.keys()}
+                for item in list(pretrained_dict.keys()):
+                    if item.startswith('layers.0') and not item.startswith('layers.0.downsample'):
+                        pretrained_dict['dec_layers.2' + item[15:]] = pretrained_dict[item]
+                    if item.startswith('layers.1') and not item.startswith('layers.1.downsample'):
+                        pretrained_dict['dec_layers.1' + item[15:]] = pretrained_dict[item]
+                    if item.startswith('layers.2') and not item.startswith('layers.2.downsample'):
+                        pretrained_dict['dec_layers.0' + item[15:]] = pretrained_dict[item]
+
+                for item in list(pretrained_dict.keys()):
+                    if 'relative_position_index' in item:
+                        pretrained_dict[item] = \
+                            interpolate(pretrained_dict[item].unsqueeze(dim=0).unsqueeze(dim=0).float(),
+                                        size=[256, 256])[0][0]
+                    if 'relative_position_bias_table' in item:
+                        pretrained_dict[item] = \
+                            interpolate(pretrained_dict[item].unsqueeze(dim=0).unsqueeze(dim=0).float(),
+                                        size=[961, pretrained_dict[item].size(1)])[0][0]
+                    if 'attn_mask' in item:
+                        pretrained_dict[item] = \
+                            interpolate(pretrained_dict[item].unsqueeze(dim=0).unsqueeze(dim=0).float(),
+                                        size=[pretrained_dict[item].size(0), 256, 256])[0][0]
 
             elif network == "hrnet" or network == "xception" or network == 'resnest':
-                load_dict = {k : v for k, v in pretrained_dict.items() if k in model_dict.keys()}
+                load_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict.keys()}
                 Log.info('Missing keys: {}'.format(list(set(model_dict) - set(load_dict))))
 
             elif network == "dcnet" or network == "resnext":
@@ -243,4 +292,3 @@ class ModuleHelper(object):
                 module.weight, mode=mode, nonlinearity=nonlinearity)
         if hasattr(module, 'bias') and module.bias is not None:
             nn.init.constant_(module.bias, bias)
-

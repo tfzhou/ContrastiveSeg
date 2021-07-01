@@ -25,8 +25,6 @@ import torch
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
-import pydensecrf.densecrf as dcrf
-import pydensecrf.utils as dcrf_utils
 
 from lib.utils.helpers.file_helper import FileHelper
 from lib.utils.helpers.image_helper import ImageHelper
@@ -37,8 +35,8 @@ from lib.models.model_manager import ModelManager
 from lib.utils.tools.logger import Logger as Log
 from lib.metrics.running_score import RunningScore
 from lib.vis.seg_visualizer import SegVisualizer
-from lib.vis.palette import get_cityscapes_colors, get_ade_colors, get_lip_colors
-from lib.vis.palette import get_pascal_context_colors, get_cocostuff_colors, get_pascal_voc_colors
+from lib.vis.palette import get_cityscapes_colors, get_ade_colors, get_lip_colors, get_camvid_colors
+from lib.vis.palette import get_pascal_context_colors, get_cocostuff_colors, get_pascal_voc_colors, get_autonue21_colors
 from segmentor.tools.module_runner import ModuleRunner
 from segmentor.tools.optim_scheduler import OptimScheduler
 from scipy import ndimage
@@ -50,6 +48,7 @@ class Tester(object):
     """
       The class for Pose Estimation. Include train, val, val & predict.
     """
+
     def __init__(self, configer):
         self.configer = configer
         self.batch_time = AverageMeter()
@@ -102,7 +101,7 @@ class Tester(object):
         Log.info('save dir {}'.format(self.save_dir))
         FileHelper.make_dirs(self.save_dir, is_file=False)
 
-        if self.configer.get('dataset') in ['cityscapes', 'gta5']:
+        if self.configer.get('dataset') in ['cityscapes', 'gta5', 'woodscape']:
             colors = get_cityscapes_colors()
         elif self.configer.get('dataset') == 'ade20k':
             colors = get_ade_colors()
@@ -114,12 +113,17 @@ class Tester(object):
             colors = get_pascal_voc_colors()
         elif self.configer.get('dataset') == 'coco_stuff':
             colors = get_cocostuff_colors()
+        elif self.configer.get('dataset') == 'camvid':
+            colors = get_camvid_colors()
+        elif self.configer.get('dataset') == 'autonue21':
+            colors = get_autonue21_colors()
         else:
             raise RuntimeError("Unsupport colors")
 
         save_prob = False
         if self.configer.get('test', 'save_prob'):
             save_prob = self.configer.get('test', 'save_prob')
+
             def softmax(X, axis=0):
                 max_prob = np.max(X, axis=axis, keepdims=True)
                 X -= max_prob
@@ -132,8 +136,10 @@ class Tester(object):
             inputs = data_dict['img']
             names = data_dict['name']
             metas = data_dict['meta']
-            
-            if 'val' in self.save_dir and os.environ.get('save_gt_label'):
+            if 'subfolder' in data_dict:
+                subfolder = data_dict['subfolder']
+
+            if '/val/' in self.save_dir: #and os.environ.get('save_gt_label'):
                 labels = data_dict['labelmap']
 
             with torch.no_grad():
@@ -141,7 +147,7 @@ class Tester(object):
                 if self.configer.exists('data', 'use_offset') and self.configer.get('data', 'use_offset') == 'offline':
                     offset_h_maps = data_dict['offsetmap_h']
                     offset_w_maps = data_dict['offsetmap_w']
-                    outputs = self.offset_test(inputs, offset_h_maps, offset_w_maps) 
+                    outputs = self.offset_test(inputs, offset_h_maps, offset_w_maps)
                 elif self.configer.get('test', 'mode') == 'ss_test':
                     outputs = self.ss_test(inputs)
                 elif self.configer.get('test', 'mode') == 'ms_test':
@@ -155,6 +161,8 @@ class Tester(object):
                     crop_size = self.configer.get('test', 'crop_size')
                     outputs = self.mscrop_test(inputs, crop_size)
                 elif self.configer.get('test', 'mode') == 'crf_ss_test':
+                    import pydensecrf.densecrf as dcrf
+                    import pydensecrf.utils as dcrf_utils
                     outputs = self.ss_test(inputs)
                     outputs = self.dense_crf_process(inputs, outputs)
 
@@ -179,7 +187,8 @@ class Tester(object):
                         np.save(prob_path, softmax(logits, axis=-1))
 
                     label_img = np.asarray(np.argmax(logits, axis=-1), dtype=np.uint8)
-                    if self.configer.exists('data', 'reduce_zero_label') and self.configer.get('data', 'reduce_zero_label'):
+                    if self.configer.exists('data', 'reduce_zero_label') and self.configer.get('data',
+                                                                                               'reduce_zero_label'):
                         label_img = label_img + 1
                         label_img = label_img.astype(np.uint8)
                     if self.configer.exists('data', 'label_list'):
@@ -188,14 +197,18 @@ class Tester(object):
                         label_img_ = label_img
                     label_img_ = Image.fromarray(label_img_, 'P')
                     Log.info('{:4d}/{:4d} label map generated'.format(image_id, self.test_size))
-                    label_path = os.path.join(self.save_dir, "label/", '{}.png'.format(names[k]))
+                    if 'subfolder' not in data_dict or len(subfolder[k]) == 0:
+                        label_path = os.path.join(self.save_dir, "label/", '{}.png'.format(names[k]))
+                    else:
+                        label_path = os.path.join(self.save_dir, "label/", '{}/{}.png'.format(subfolder[k], names[k]))
+
                     FileHelper.make_dirs(label_path, is_file=True)
                     ImageHelper.save(label_img_, label_path)
 
                     # colorize the label-map
                     if os.environ.get('save_gt_label'):
-                        if self.configer.exists('data', 'reduce_zero_label') and self.configer.get('data', 'reduce_zero_label'):
-                            label_img = labels[k] + 1
+                        if self.configer.exists('data', 'reduce_zero_label') and self.configer.get('data','reduce_zero_label'):
+                            label_img = labels[k]
                             label_img = np.asarray(label_img, dtype=np.uint8)
                         color_img_ = Image.fromarray(label_img)
                         color_img_.putpalette(colors)
@@ -209,12 +222,71 @@ class Tester(object):
                         FileHelper.make_dirs(vis_path, is_file=True)
                         ImageHelper.save(color_img_, save_path=vis_path)
 
+                    # # visualize
+                    # from lib.datasets.tools.transforms import DeNormalize
+                    # mean = self.configer.get('normalize', 'mean')
+                    # std = self.configer.get('normalize', 'std')
+                    # div_value = self.configer.get('normalize', 'div_value')
+                    # org_img = DeNormalize(div_value, mean, std)(inputs[k])
+                    # org_img = org_img.permute(1, 2, 0).cpu().numpy().astype(np.uint8)
+                    # org_img = cv2.cvtColor(org_img, cv2.COLOR_BGR2RGB)
+
+
+                    # # colorize the label-map
+                    # if os.environ.get('save_gt_label'):
+                    #     if self.configer.exists('data', 'reduce_zero_label') and self.configer.get('data',
+                    #                                                                                'reduce_zero_label'):
+                    #         label_img = labels[k] + 1
+                    #         label_img = np.asarray(label_img, dtype=np.uint8)
+                    #
+                    #     label_img = cv2.resize(label_img, (org_img.shape[1], org_img.shape[0]),
+                    #                            interpolation=cv2.INTER_NEAREST)
+                    #     color_img_ = Image.fromarray(label_img)
+                    #     color_img_.putpalette(colors)
+                    #     color_img_ = np.asarray(color_img_.convert('RGB'), np.uint8)
+                    #
+                    #     sys_img_part = cv2.addWeighted(org_img, 0.5, color_img_, 0.5, 0.0)
+                    #     sys_img_part = cv2.cvtColor(sys_img_part, cv2.COLOR_RGB2BGR)
+                    #
+                    #     for i in range(0, 200):
+                    #         mask = np.zeros_like(label_img)
+                    #         mask[label_img == i] = 1
+                    #
+                    #         contours = cv2.findContours(mask.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[-2]
+                    #         cv2.drawContours(sys_img_part, contours, -1, (255, 255, 255),
+                    #                          1, cv2.LINE_AA)
+                    #
+                    #     vis_path = os.path.join(self.save_dir, "gt_vis_overlay/", '{}.png'.format(names[k]))
+                    #     FileHelper.make_dirs(vis_path, is_file=True)
+                    #     ImageHelper.save(sys_img_part, save_path=vis_path)
+                    #
+                    # else:
+                    #     label_img = cv2.resize(label_img, (org_img.shape[1], org_img.shape[0]), interpolation=cv2.INTER_NEAREST)
+                    #     color_img_ = Image.fromarray(label_img)
+                    #     color_img_.putpalette(colors)
+                    #     color_img_ = np.asarray(color_img_.convert('RGB'), np.uint8)
+                    #
+                    #     sys_img_part = cv2.addWeighted(org_img, 0.5, color_img_, 0.5, 0.0)
+                    #
+                    #     sys_img_part = cv2.cvtColor(sys_img_part, cv2.COLOR_RGB2BGR)
+                    #
+                    #     for i in range(0, 200):
+                    #         mask = np.zeros_like(label_img)
+                    #         mask[label_img == i] = 1
+                    #
+                    #         contours = cv2.findContours(mask.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)[-2]
+                    #         cv2.drawContours(sys_img_part, contours, -1, (255, 255, 255),
+                    #                          1, cv2.LINE_AA)
+                    #
+                    #     vis_path = os.path.join(self.save_dir, "vis_overlay/", '{}.png'.format(names[k]))
+                    #     FileHelper.make_dirs(vis_path, is_file=True)
+                    #     ImageHelper.save(sys_img_part, save_path=vis_path)
+
             self.batch_time.update(time.time() - start_time)
             start_time = time.time()
 
         # Print the log info & reset the states.
         Log.info('Test Time {batch_time.sum:.3f}s'.format(batch_time=self.batch_time))
-
 
     def offset_test(self, inputs, offset_h_maps, offset_w_maps, scale=1):
         if isinstance(inputs, torch.Tensor):
@@ -224,7 +296,8 @@ class Tester(object):
             torch.cuda.synchronize()
             end = timeit.default_timer()
 
-            if (self.configer.get('loss', 'loss_type') == "fs_auxce_loss") or (self.configer.get('loss', 'loss_type') == "triple_auxce_loss"):
+            if (self.configer.get('loss', 'loss_type') == "fs_auxce_loss") or (
+                    self.configer.get('loss', 'loss_type') == "triple_auxce_loss"):
                 outputs = outputs[-1]
             elif self.configer.get('loss', 'loss_type') == "pyramid_auxce_loss":
                 outputs = outputs[1] + outputs[2] + outputs[3] + outputs[4]
@@ -234,16 +307,22 @@ class Tester(object):
         else:
             raise RuntimeError("Unsupport data type: {}".format(type(inputs)))
 
-
     def ss_test(self, inputs, scale=1):
         if isinstance(inputs, torch.Tensor):
             n, c, h, w = inputs.size(0), inputs.size(1), inputs.size(2), inputs.size(3)
-            scaled_inputs = F.interpolate(inputs, size=(int(h*scale), int(w*scale)), mode="bilinear", align_corners=True)
+            scaled_inputs = F.interpolate(inputs, size=(int(h * scale), int(w * scale)), mode="bilinear",
+                                          align_corners=True)
             start = timeit.default_timer()
             outputs = self.seg_net.forward(scaled_inputs)
             torch.cuda.synchronize()
             end = timeit.default_timer()
-            outputs = outputs[-1]
+
+            if isinstance(outputs, list):
+                outputs = outputs[-1]
+            elif isinstance(outputs, dict):
+                outputs = outputs['seg']
+            elif isinstance(outputs, tuple):
+                outputs = outputs[-1]
             outputs = F.interpolate(outputs, size=(h, w), mode='bilinear', align_corners=True)
             return outputs
         elif isinstance(inputs, collections.Sequence):
@@ -253,7 +332,8 @@ class Tester(object):
             for i, d in zip(inputs, device_ids):
                 h, w = i.size(1), i.size(2)
                 ori_size.append((h, w))
-                i = F.interpolate(i.unsqueeze(0), size=(int(h*scale), int(w*scale)), mode="bilinear", align_corners=True)
+                i = F.interpolate(i.unsqueeze(0), size=(int(h * scale), int(w * scale)), mode="bilinear",
+                                  align_corners=True)
                 scaled_inputs.append(i.cuda(d, non_blocking=True))
             scaled_outputs = nn.parallel.parallel_apply(replicas[:len(scaled_inputs)], scaled_inputs)
             for i, output in enumerate(scaled_outputs):
@@ -262,20 +342,19 @@ class Tester(object):
         else:
             raise RuntimeError("Unsupport data type: {}".format(type(inputs)))
 
-
     def flip(self, x, dim):
         indices = [slice(None)] * x.dim()
         indices[dim] = torch.arange(x.size(dim) - 1, -1, -1,
                                     dtype=torch.long, device=x.device)
         return x[tuple(indices)]
 
-
     def sscrop_test(self, inputs, crop_size, scale=1):
         '''
         Currently, sscrop_test does not support diverse_size testing
         '''
         n, c, ori_h, ori_w = inputs.size(0), inputs.size(1), inputs.size(2), inputs.size(3)
-        scaled_inputs = F.interpolate(inputs, size=(int(ori_h*scale), int(ori_w*scale)), mode="bilinear", align_corners=True)
+        scaled_inputs = F.interpolate(inputs, size=(int(ori_h * scale), int(ori_w * scale)), mode="bilinear",
+                                      align_corners=True)
         n, c, h, w = scaled_inputs.size(0), scaled_inputs.size(1), scaled_inputs.size(2), scaled_inputs.size(3)
         full_probs = torch.cuda.FloatTensor(n, self.configer.get('data', 'num_classes'), h, w).fill_(0)
         count_predictions = torch.cuda.FloatTensor(n, self.configer.get('data', 'num_classes'), h, w).fill_(0)
@@ -287,10 +366,10 @@ class Tester(object):
 
         for height in height_starts:
             for width in width_starts:
-                crop_inputs = scaled_inputs[:, :, height:height+crop_size[0], width:width + crop_size[1]]
+                crop_inputs = scaled_inputs[:, :, height:height + crop_size[0], width:width + crop_size[1]]
                 prediction = self.ss_test(crop_inputs)
-                count_predictions[:, :, height:height+crop_size[0], width:width + crop_size[1]] += 1
-                full_probs[:, :, height:height+crop_size[0], width:width + crop_size[1]] += prediction 
+                count_predictions[:, :, height:height + crop_size[0], width:width + crop_size[1]] += 1
+                full_probs[:, :, height:height + crop_size[0], width:width + crop_size[1]] += prediction
                 crop_counter += 1
                 Log.info('predicting {:d}-th crop'.format(crop_counter))
 
@@ -298,13 +377,13 @@ class Tester(object):
         full_probs = F.interpolate(full_probs, size=(ori_h, ori_w), mode='bilinear', align_corners=True)
         return full_probs
 
-
     def ms_test(self, inputs):
-        if isinstance(inputs, torch.Tensor):  
+        if isinstance(inputs, torch.Tensor):
             n, c, h, w = inputs.size(0), inputs.size(1), inputs.size(2), inputs.size(3)
             full_probs = torch.cuda.FloatTensor(n, self.configer.get('data', 'num_classes'), h, w).fill_(0)
             if self.configer.exists('test', 'scale_weights'):
-                for scale, weight in zip(self.configer.get('test', 'scale_search'), self.configer.get('test', 'scale_weights')):
+                for scale, weight in zip(self.configer.get('test', 'scale_search'),
+                                         self.configer.get('test', 'scale_weights')):
                     probs = self.ss_test(inputs, scale)
                     flip_probs = self.ss_test(self.flip(inputs, 3), scale)
                     probs = probs + self.flip(flip_probs, 3)
@@ -320,13 +399,14 @@ class Tester(object):
 
         elif isinstance(inputs, collections.Sequence):
             device_ids = self.configer.get('gpu')
-            full_probs = [torch.zeros(1, self.configer.get('data', 'num_classes'), 
-                i.size(1), i.size(2)).cuda(device_ids[index], non_blocking=True)
-                for index, i in enumerate(inputs)]
+            full_probs = [torch.zeros(1, self.configer.get('data', 'num_classes'),
+                                      i.size(1), i.size(2)).cuda(device_ids[index], non_blocking=True)
+                          for index, i in enumerate(inputs)]
             flip_inputs = [self.flip(i, 2) for i in inputs]
 
             if self.configer.exists('test', 'scale_weights'):
-                for scale, weight in zip(self.configer.get('test', 'scale_search'), self.configer.get('test', 'scale_weights')):
+                for scale, weight in zip(self.configer.get('test', 'scale_search'),
+                                         self.configer.get('test', 'scale_weights')):
                     probs = self.ss_test(inputs, scale)
                     flip_probs = self.ss_test(flip_inputs, scale)
                     for i in range(len(inputs)):
@@ -343,12 +423,11 @@ class Tester(object):
         else:
             raise RuntimeError("Unsupport data type: {}".format(type(inputs)))
 
-
     def ms_test_depth(self, inputs, names):
         prob_list = []
         scale_list = []
 
-        if isinstance(inputs, torch.Tensor):  
+        if isinstance(inputs, torch.Tensor):
             n, c, h, w = inputs.size(0), inputs.size(1), inputs.size(2), inputs.size(3)
             full_probs = torch.cuda.FloatTensor(n, self.configer.get('data', 'num_classes'), h, w).fill_(0)
 
@@ -364,7 +443,6 @@ class Tester(object):
 
         else:
             raise RuntimeError("Unsupport data type: {}".format(type(inputs)))
-
 
     def fuse_with_depth(self, probs, scales, names):
         MAX_DEPTH = 63
@@ -391,7 +469,8 @@ class Tester(object):
                 weight_map = np.abs(depth_map - scale_index)
                 weight_map = np.power(POWER_BASE, weight_map)
                 weight_map = cv2.resize(weight_map, (w, h))
-                full_probs[index, :, :, :] += torch.from_numpy(np.expand_dims(weight_map, axis=0)).type(torch.cuda.FloatTensor) * prob[index, :, :, :]
+                full_probs[index, :, :, :] += torch.from_numpy(np.expand_dims(weight_map, axis=0)).type(
+                    torch.cuda.FloatTensor) * prob[index, :, :, :]
 
         return full_probs
 
@@ -402,9 +481,8 @@ class Tester(object):
                 return idx
         return 0
 
-
     def ms_test_wo_flip(self, inputs):
-        if isinstance(inputs, torch.Tensor):  
+        if isinstance(inputs, torch.Tensor):
             n, c, h, w = inputs.size(0), inputs.size(1), inputs.size(2), inputs.size(3)
             full_probs = torch.cuda.FloatTensor(n, self.configer.get('data', 'num_classes'), h, w).fill_(0)
             for scale in self.configer.get('test', 'scale_search'):
@@ -413,9 +491,9 @@ class Tester(object):
             return full_probs
         elif isinstance(inputs, collections.Sequence):
             device_ids = self.configer.get('gpu')
-            full_probs = [torch.zeros(1, self.configer.get('data', 'num_classes'), 
-                i.size(1), i.size(2)).cuda(device_ids[index], non_blocking=True)
-                for index, i, in enumerate(inputs)]
+            full_probs = [torch.zeros(1, self.configer.get('data', 'num_classes'),
+                                      i.size(1), i.size(2)).cuda(device_ids[index], non_blocking=True)
+                          for index, i, in enumerate(inputs)]
             for scale in self.configer.get('test', 'scale_search'):
                 probs = self.ss_test(inputs, scale)
                 for i in range(len(inputs)):
@@ -424,8 +502,7 @@ class Tester(object):
         else:
             raise RuntimeError("Unsupport data type: {}".format(type(inputs)))
 
-
-    def mscrop_test(self, inputs, crop_size):  
+    def mscrop_test(self, inputs, crop_size):
         '''
         Currently, mscrop_test does not support diverse_size testing
         '''
@@ -445,17 +522,15 @@ class Tester(object):
                 full_probs += probs
         return full_probs
 
-
     def _decide_intersection(self, total_length, crop_length):
         stride = crop_length
         times = (total_length - crop_length) // stride + 1
         cropped_starting = []
         for i in range(times):
-            cropped_starting.append(stride*i)
+            cropped_starting.append(stride * i)
         if total_length - cropped_starting[-1] > crop_length:
             cropped_starting.append(total_length - crop_length)  # must cover the total image
         return cropped_starting
-
 
     def dense_crf_process(self, images, outputs):
         '''
@@ -477,14 +552,15 @@ class Tester(object):
         bi_rgb_std = 3
 
         b = images.size(0)
-        mean_vector = np.expand_dims(np.expand_dims(np.transpose(np.array([102.9801, 115.9465, 122.7717])), axis=1), axis=2)
+        mean_vector = np.expand_dims(np.expand_dims(np.transpose(np.array([102.9801, 115.9465, 122.7717])), axis=1),
+                                     axis=2)
         outputs = F.softmax(outputs, dim=1)
         for i in range(b):
             unary = outputs[i].data.cpu().numpy()
             C, H, W = unary.shape
             unary = dcrf_utils.unary_from_softmax(unary)
             unary = np.ascontiguousarray(unary)
-            
+
             image = np.ascontiguousarray(images[i]) + mean_vector
             image = image.astype(np.ubyte)
             image = np.ascontiguousarray(image.transpose(1, 2, 0))
