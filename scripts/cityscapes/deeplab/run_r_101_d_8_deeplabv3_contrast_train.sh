@@ -8,27 +8,27 @@ SCRATCH_ROOT=$4
 ASSET_ROOT=${DATA_ROOT}
 
 DATA_DIR="${DATA_ROOT}/Cityscapes"
-SAVE_DIR="${SCRATCH_ROOT}/Cityscapes/seg_results/"
-BACKBONE="hrnet48"
+SAVE_DIR="${SCRATCH_ROOT}/seg_results/cityscapes"
+BACKBONE="deepbase_resnet101_dilated8"
 
-CONFIGS="configs/cityscapes/H_48_D_4.json"
-CONFIGS_TEST="configs/cityscapes/H_48_D_4_TEST.json"
+CONFIGS="configs/cityscapes/R_101_D_8.json"
+CONFIGS_TEST="configs/cityscapes/R_101_D_8_TEST.json"
 
-MODEL_NAME="hrnet_w48_ocr"
-LOSS_TYPE="fs_auxce_loss"
+MODEL_NAME="deeplab_v3_contrast"
+LOSS_TYPE="contrast_auxce_loss"
 CHECKPOINTS_ROOT="${SCRATCH_ROOT}/Cityscapes/"
-CHECKPOINTS_NAME="${MODEL_NAME}_paddle_lr2x_"$2
+CHECKPOINTS_NAME="${MODEL_NAME}_${BACKBONE}_"$2
 LOG_FILE="${SCRATCH_ROOT}/logs/Cityscapes/${CHECKPOINTS_NAME}.log"
 echo "Logging to $LOG_FILE"
 mkdir -p `dirname $LOG_FILE`
 
-PRETRAINED_MODEL="${ASSET_ROOT}/hrnetv2_w48_imagenet_pretrained.pth"
+PRETRAINED_MODEL="${ASSET_ROOT}/resnet101-imagenet.pth"
 MAX_ITERS=40000
 BATCH_SIZE=8
 BASE_LR=0.01
 
 if [ "$1"x == "train"x ]; then
-  python -u main.py --configs ${CONFIGS} \
+  python -u main_contrastive.py --configs ${CONFIGS} \
                        --drop_last y \
                        --phase train \
                        --gathered n \
@@ -43,18 +43,18 @@ if [ "$1"x == "train"x ]; then
                        --checkpoints_root ${CHECKPOINTS_ROOT} \
                        --checkpoints_name ${CHECKPOINTS_NAME} \
                        --pretrained ${PRETRAINED_MODEL} \
-                       --train_batch_size ${BATCH_SIZE} \
                        --distributed \
+                       --train_batch_size ${BATCH_SIZE} \
                        --base_lr ${BASE_LR} \
                        2>&1 | tee ${LOG_FILE}
                        
 
 elif [ "$1"x == "resume"x ]; then
-  python -u main.py --configs ${CONFIGS} \
+  python -u main_contrastive.py --configs ${CONFIGS} \
                        --drop_last y \
                        --phase train \
-                       --gathered n \
-                       --loss_balance y \
+                       --gathered y \
+                       --loss_balance n \
                        --log_to_file n \
                        --backbone ${BACKBONE} \
                        --model_name ${MODEL_NAME} \
@@ -63,23 +63,24 @@ elif [ "$1"x == "resume"x ]; then
                        --loss_type ${LOSS_TYPE} \
                        --gpu 0 1 2 3 \
                        --resume_continue y \
-                       --resume ${CHECKPOINTS_ROOT}/checkpoints/cityscapes/${CHECKPOINTS_NAME}_latest.pth \
+                       --resume ./checkpoints/cityscapes/${CHECKPOINTS_NAME}_latest.pth \
                        --checkpoints_name ${CHECKPOINTS_NAME} \
                         2>&1 | tee -a ${LOG_FILE}
 
-
 elif [ "$1"x == "val"x ]; then
-  python -u main.py --configs ${CONFIGS} --drop_last y  --data_dir ${DATA_DIR} \
+  python -u main.py --configs ${CONFIGS} --drop_last y \
                        --backbone ${BACKBONE} --model_name ${MODEL_NAME} --checkpoints_name ${CHECKPOINTS_NAME} \
                        --phase test --gpu 0 1 2 3 --resume ${CHECKPOINTS_ROOT}/checkpoints/cityscapes/${CHECKPOINTS_NAME}_latest.pth \
                        --loss_type ${LOSS_TYPE} --test_dir ${DATA_DIR}/val/image \
-                       --out_dir ${SAVE_DIR}${CHECKPOINTS_NAME}_val_ms
+                       --out_dir ${SAVE_DIR}${CHECKPOINTS_NAME}_val --data_dir ${DATA_DIR}
 
-  python -m lib.metrics.cityscapes_evaluator --pred_dir ${SAVE_DIR}${CHECKPOINTS_NAME}_val_ms/label  \
+
+  cd lib/metrics
+  python -u cityscapes_evaluator.py --pred_dir ${SAVE_DIR}${CHECKPOINTS_NAME}_val/label  \
                                        --gt_dir ${DATA_DIR}/val/label
 
 elif [ "$1"x == "segfix"x ]; then
-  if [ "$5"x == "test"x ]; then
+  if [ "$3"x == "test"x ]; then
     DIR=${SAVE_DIR}${CHECKPOINTS_NAME}_test_ss/label
     echo "Applying SegFix for $DIR"
     ${PYTHON} scripts/cityscapes/segfix.py \
@@ -96,7 +97,7 @@ elif [ "$1"x == "segfix"x ]; then
   fi
 
 elif [ "$1"x == "test"x ]; then
-  if [ "$3"x == "ss"x ]; then
+  if [ "$5"x == "ss"x ]; then
     echo "[single scale] test"
     python -u main.py --configs ${CONFIGS} --drop_last y --data_dir ${DATA_DIR} \
                          --backbone ${BACKBONE} --model_name ${MODEL_NAME} --checkpoints_name ${CHECKPOINTS_NAME} \
@@ -105,13 +106,12 @@ elif [ "$1"x == "test"x ]; then
                          --out_dir ${SAVE_DIR}${CHECKPOINTS_NAME}_test_ss
   else
     echo "[multiple scale + flip] test"
-    python -u main.py --configs ${CONFIGS_TEST} --drop_last y --data_dir ${DATA_DIR} \
+    python -u main.py --configs ${CONFIGS_TEST} --drop_last y \
                          --backbone ${BACKBONE} --model_name ${MODEL_NAME} --checkpoints_name ${CHECKPOINTS_NAME} \
-                         --phase test --gpu 0 1 2 3 --resume ${CHECKPOINTS_ROOT}/checkpoints/cityscapes/${CHECKPOINTS_NAME}_latest.pth \
+                         --phase test --gpu 0 1 2 3 --resume ./checkpoints/cityscapes/${CHECKPOINTS_NAME}_latest.pth \
                          --test_dir ${DATA_DIR}/test --log_to_file n \
                          --out_dir ${SAVE_DIR}${CHECKPOINTS_NAME}_test_ms
   fi
-
 
 else
   echo "$1"x" is invalid..."

@@ -382,8 +382,8 @@ class Trainer(object):
         self.evaluator.update_performance()
 
         self.configer.update(['val_loss'], self.val_losses.avg)
-        self.module_runner.save_net(self.seg_net, save_mode='performance', experiment=self.experiment)
-        self.module_runner.save_net(self.seg_net, save_mode='val_loss', experiment=self.experiment)
+        self.module_runner.save_net(self.seg_net, save_mode='performance', experiment=None)
+        self.module_runner.save_net(self.seg_net, save_mode='val_loss', experiment=None)
         cudnn.benchmark = True
 
         # Print the log info & reset the states.

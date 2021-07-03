@@ -210,25 +210,25 @@ class ContrastAuxCELoss(nn.Module, ABC):
 
         self.contrast_criterion = PixelContrastLoss(configer=configer)
 
-    def forward(self, preds, target):
+    def forward(self, preds, target, with_embed=False):
         h, w = target.size(1), target.size(2)
 
         assert "seg" in preds
         assert "seg_aux" in preds
+        assert "embed" in preds
 
         seg = preds['seg']
         seg_aux = preds['seg_aux']
-
-        embedding = preds['embedding'] if 'embedding' in preds else None
+        embedding = preds['embed']
 
         pred = F.interpolate(input=seg, size=(h, w), mode='bilinear', align_corners=True)
         pred_aux = F.interpolate(input=seg_aux, size=(h, w), mode='bilinear', align_corners=True)
         loss = self.seg_criterion([pred_aux, pred], target)
 
-        if embedding is not None:
-            _, predict = torch.max(seg, 1)
+        _, predict = torch.max(seg, 1)
+        loss_contrast = self.contrast_criterion(embedding, target, predict)
 
-            loss_contrast = self.contrast_criterion(embedding, target, predict)
+        if with_embed is True:
             return loss + self.loss_weight * loss_contrast
 
-        return loss
+        return loss + 0 * loss_contrast  # just a trick to avoid errors in distributed training

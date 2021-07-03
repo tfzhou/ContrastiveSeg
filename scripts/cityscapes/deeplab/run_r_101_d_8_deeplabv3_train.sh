@@ -23,7 +23,9 @@ echo "Logging to $LOG_FILE"
 mkdir -p `dirname $LOG_FILE`
 
 PRETRAINED_MODEL="${ASSET_ROOT}/resnet101-imagenet.pth"
-MAX_ITERS=80000
+MAX_ITERS=40000
+BATCH_SIZE=8
+BASE_LR=0.01
 
 if [ "$1"x == "train"x ]; then
   python -u main.py --configs ${CONFIGS} \
@@ -42,6 +44,8 @@ if [ "$1"x == "train"x ]; then
                        --checkpoints_name ${CHECKPOINTS_NAME} \
                        --pretrained ${PRETRAINED_MODEL} \
                        --distributed \
+                       --train_batch_size ${BATCH_SIZE} \
+                       --base_lr ${BASE_LR} \
                        2>&1 | tee ${LOG_FILE}
                        
 

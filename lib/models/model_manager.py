@@ -25,7 +25,7 @@ from lib.models.nets.ideal_ocrnet import IdealSpatialOCRNet, IdealSpatialOCRNetB
 
 # HRNet
 from lib.models.nets.hrnet import HRNet_W48, HRNet_W48_CONTRAST
-from lib.models.nets.hrnet import HRNet_W48_OCR, HRNet_W48_ASPOCR, HRNet_W48_OCR_B, HRNet_W48_OCR_B_HA
+from lib.models.nets.hrnet import HRNet_W48_OCR, HRNet_W48_OCR_B, HRNet_W48_OCR_B_HA, HRNet_W48_OCR_CONTRAST
 
 # OCNet
 from lib.models.nets.ocnet import BaseOCNet, AspOCNet
@@ -41,7 +41,7 @@ from lib.models.nets.segfix import SegFix_HRNet
 
 from lib.utils.tools.logger import Logger as Log
 
-from lib.models.nets.deeplab import DeepLabV3, DeepLabV3_MobileNet, DeepLabV3_MobileNetV3, DeepLabV3_MobileNetV1
+from lib.models.nets.deeplab import DeepLabV3, DeepLabV3Contrast
 
 from lib.models.nets.ms_ocrnet import MscaleOCR
 
@@ -66,7 +66,6 @@ SEG_MODEL_DICT = {
     'hrnet_w48': HRNet_W48,
     'hrnet_w48_ocr': HRNet_W48_OCR,
     'hrnet_w48_ocr_b': HRNet_W48_OCR_B,
-    'hrnet_w48_asp_ocr': HRNet_W48_ASPOCR,
     # CE2P series
     'ce2p_asp_ocrnet': CE2P_ASPOCR,
     'ce2p_ocrnet': CE2P_OCRNet,
@@ -74,7 +73,9 @@ SEG_MODEL_DICT = {
     # baseline series
     'fcnet': FcnNet,
     'hrnet_w48_contrast': HRNet_W48_CONTRAST,
+    'hrnet_w48_ocr_contrast': HRNet_W48_OCR_CONTRAST,
     'deeplab_v3': DeepLabV3,
+    'deeplab_v3_contrast': DeepLabV3Contrast,
     'ms_ocr': MscaleOCR,
     'hrnet_w48_ocr_b_ha': HRNet_W48_OCR_B_HA,
 }

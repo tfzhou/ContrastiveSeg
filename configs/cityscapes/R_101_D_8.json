@@ -132,5 +132,16 @@
         "ohem_minkeep": 100000,
         "ohem_thresh": 0.7
       }
+    },
+    "contrast": {
+      "proj_dim": 256,
+      "temperature": 0.1,
+      "base_temperature": 0.07,
+      "max_samples": 1024,
+      "max_views": 100,
+      "stride": 8,
+      "warmup_iters": 5000,
+      "loss_weight": 0.1,
+      "use_rmi": false
     }
 }

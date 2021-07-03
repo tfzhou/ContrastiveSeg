@@ -4,7 +4,7 @@
 
 > [**Exploring Cross-Image Pixel Contrast for Semantic Segmentation**](https://arxiv.org/abs/2101.11939),            
 > [Wenguan Wang](https://sites.google.com/view/wenguanwang/), [Tianfei Zhou](https://www.tfzhou.com/), [Fisher Yu](https://www.yf.io/), [Jifeng Dai](https://jifengdai.org/), [Ender Konukoglu](https://scholar.google.com/citations?user=OeEMrhQAAAAJ&hl=en) and [Luc Van Gool](https://scholar.google.com/citations?user=TwMib_QAAAAJ&hl=en) <br>
-> *arXiv technical report ([arXiv 2101.11939](https://arxiv.org/abs/2101.11939))*  
+> *arXiv technical report ([arXiv 2101.11939](https://arxiv.org/abs/2101.11939))*
 
 ## News
 
@@ -37,10 +37,13 @@ Please follow the [Getting Started](https://github.com/openseg-group/openseg.pyt
 
 ### Cityscapes Dataset
 
-| Backbone  | Train Set | Val Set | Iterations | Batch Size | Contrast Loss | Memory | mIoU  | Log | CKPT |Script |
-| --------- | --------- | ------- | ---------- | ---------- | ------------- | ------ | ----- | --- | ----   | ----   |
-| HRNet-W48 | train     | val     | 40000      | 8          | N             | N      | 79.27 | [log](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/hrnet_w48_lr1x_hrnet_ce.log) | [ckpt](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/hrnet_w48_lr1x_hrnet_ce_max_performance.pth) |```scripts/cityscapes/hrnet/run_h_48_d_4.sh```|
-| HRNet-W48 | train     | val     | 40000      | 8          | Y             | N      | 80.18 | [log](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/hrnet_w48_contrast_lr1x_hrnet_contrast_t0.1.log) | [ckpt](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/hrnet_w48_contrast_lr1x_hrnet_contrast_t0.1_max_performance.pth) |```scripts/cityscapes/hrnet/run_h_48_d_4_contrast.sh```|
+| Backbone  | Model      | Train Set | Val Set | Iterations | Batch Size | Contrast Loss | Memory | mIoU  | Log | CKPT |Script |
+| --------- | ---------- | --------- | ------- | ---------- | ---------- | ------------- | ------ | ----- | --- | ----   | ----   |
+| ResNet-101| DeepLab-V3 |train     | val     | 40000      | 8          | N             | N      | 72.75 | [log](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/deeplab_v3_deepbase_resnet101_dilated8_deeplab_v3.log) | [ckpt](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/deeplab_v3_deepbase_resnet101_dilated8_deeplab_v3_max_performance.pth) |```scripts/cityscapes/deeplab/run_r_101_d_8_deeplabv3_train.sh```|
+| ResNet-101| DeepLab-V3 |train     | val     | 40000      | 8          | Y             | N      | 77.67 | [log](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/deeplab_v3_contrast_deepbase_resnet101_dilated8_deeplab_v3_contrast.log) | [ckpt](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/deeplab_v3_contrast_deepbase_resnet101_dilated8_deeplab_v3_contrast_max_performance.pth) |```scripts/cityscapes/deeplab/run_r_101_d_8_deeplabv3_contrast_train.sh```|
+| HRNet-W48 | HRNet-W48  |train     | val     | 40000      | 8          | N             | N      | 79.27 | [log](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/hrnet_w48_lr1x_hrnet_ce.log) | [ckpt](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/hrnet_w48_lr1x_hrnet_ce_max_performance.pth) |```scripts/cityscapes/hrnet/run_h_48_d_4.sh```|
+| HRNet-W48 | HRNet-W48  |train     | val     | 40000      | 8          | Y             | N      | 80.18 | [log](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/hrnet_w48_contrast_lr1x_hrnet_contrast_t0.1.log) | [ckpt](https://github.com/tfzhou/pretrained_weights/releases/download/v0.1/hrnet_w48_contrast_lr1x_hrnet_contrast_t0.1_max_performance.pth) |```scripts/cityscapes/hrnet/run_h_48_d_4_contrast.sh```|
+_It seems that the DeepLab-V3 baseline does not produce the expected performance on the new codebase. I will tune this later._
 
 
 ### Study of the temperature

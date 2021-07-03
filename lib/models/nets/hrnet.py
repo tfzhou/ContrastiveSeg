@@ -66,6 +66,7 @@ class HRNet_W48_CONTRAST(nn.Module):
         self.configer = configer
         self.num_classes = self.configer.get('data', 'num_classes')
         self.backbone = BackboneSelector(configer).get_backbone()
+        self.proj_dim = self.configer.get('contrast', 'proj_dim')
 
         # extra added layers
         in_channels = 720  # 48 + 96 + 192 + 384
@@ -76,7 +77,7 @@ class HRNet_W48_CONTRAST(nn.Module):
             nn.Conv2d(in_channels, self.num_classes, kernel_size=1, stride=1, padding=0, bias=False)
         )
 
-        self.proj_head = ProjectionHead(dim_in=in_channels)
+        self.proj_head = ProjectionHead(dim_in=in_channels, proj_dim=self.proj_dim)
 
     def forward(self, x_, with_embed=False, is_eval=False):
         x = self.backbone(x_)
@@ -94,31 +95,38 @@ class HRNet_W48_CONTRAST(nn.Module):
         return {'seg': out, 'embed': emb}
 
 
-class HRNet_W48_ASPOCR(nn.Module):
+class HRNet_W48_OCR_CONTRAST(nn.Module):
     def __init__(self, configer):
-        super(HRNet_W48_ASPOCR, self).__init__()
+        super(HRNet_W48_OCR_CONTRAST, self).__init__()
         self.configer = configer
         self.num_classes = self.configer.get('data', 'num_classes')
         self.backbone = BackboneSelector(configer).get_backbone()
+        self.proj_dim = self.configer.get('contrast', 'proj_dim')
 
-        # extra added layers
-        in_channels = 720  # 48 + 96 + 192 + 384
-        from lib.models.modules.spatial_ocr_block import SpatialOCR_ASP_Module
-        self.asp_ocr_head = SpatialOCR_ASP_Module(features=720,
-                                                  hidden_features=256,
-                                                  out_features=256,
-                                                  dilations=(24, 48, 72),
-                                                  num_classes=self.num_classes,
-                                                  bn_type=self.configer.get('network', 'bn_type'))
-
-        self.cls_head = nn.Conv2d(256, self.num_classes, kernel_size=1, stride=1, padding=0, bias=False)
-        self.aux_head = nn.Sequential(
+        in_channels = 720
+        self.conv3x3 = nn.Sequential(
             nn.Conv2d(in_channels, 512, kernel_size=3, stride=1, padding=1),
             ModuleHelper.BNReLU(512, bn_type=self.configer.get('network', 'bn_type')),
-            nn.Conv2d(512, self.num_classes, kernel_size=1, stride=1, padding=0, bias=False)
+        )
+        from lib.models.modules.spatial_ocr_block import SpatialGather_Module
+        self.ocr_gather_head = SpatialGather_Module(self.num_classes)
+        from lib.models.modules.spatial_ocr_block import SpatialOCR_Module
+        self.ocr_distri_head = SpatialOCR_Module(in_channels=512,
+                                                 key_channels=256,
+                                                 out_channels=512,
+                                                 scale=1,
+                                                 dropout=0.05,
+                                                 bn_type=self.configer.get('network', 'bn_type'))
+        self.cls_head = nn.Conv2d(512, self.num_classes, kernel_size=1, stride=1, padding=0, bias=True)
+        self.aux_head = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=1, padding=1),
+            ModuleHelper.BNReLU(in_channels, bn_type=self.configer.get('network', 'bn_type')),
+            nn.Conv2d(in_channels, self.num_classes, kernel_size=1, stride=1, padding=0, bias=True)
         )
 
-    def forward(self, x_):
+        self.proj_head = ProjectionHead(dim_in=in_channels, proj_dim=self.proj_dim)
+
+    def forward(self, x_, with_embed=False, is_eval=False):
         x = self.backbone(x_)
         _, _, h, w = x[0].size()
 
@@ -130,12 +138,16 @@ class HRNet_W48_ASPOCR(nn.Module):
         feats = torch.cat([feat1, feat2, feat3, feat4], 1)
         out_aux = self.aux_head(feats)
 
-        feats = self.asp_ocr_head(feats, out_aux)
+        emb = self.proj_head(feats)
+
+        feats = self.conv3x3(feats)
+
+        context = self.ocr_gather_head(feats, out_aux)
+        feats = self.ocr_distri_head(feats, context)
+
         out = self.cls_head(feats)
 
-        out_aux = F.interpolate(out_aux, size=(x_.size(2), x_.size(3)), mode="bilinear", align_corners=True)
-        out = F.interpolate(out, size=(x_.size(2), x_.size(3)), mode="bilinear", align_corners=True)
-        return out_aux, out
+        return {'seg': out, 'seg_aux': out_aux, 'embed': emb}
 
 
 class HRNet_W48_OCR(nn.Module):
