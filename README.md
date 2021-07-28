@@ -8,6 +8,8 @@
 
 ## News
 
+* [2021-07-28] ContrastiveSeg has been accepted in ICCV'21 as Oral.
+* [2021-07-28] Update memory code.
 * [2021-07-01] The codebase has been transferred from Pytorch-0.4.1 to Pytorch-1.7.1, which will be easier for usage.
 
 ## Abstract
@@ -56,15 +58,6 @@ _It seems that the DeepLab-V3 baseline does not produce the expected performance
 | HRNet-W48 | train     | val     | 40000      | 8          | 0.20          | 80.01 |
 | HRNet-W48 | train     | val     | 40000      | 8          | 0.30          | 79.27 |
 | HRNet-W48 | train     | val     | 40000      | 8          | 0.40          | 79.40 |
-
-
-## Features (in progress)
-
-- [x] Pixel-wise Contrastive Loss
-- [x] Hard Anchor Sampling
-- [ ] Memory Bank
-- [ ] Hard Example Mining
-- [ ] Model Zoo
 
 
 ## t-SNE Visualization
