@@ -67,7 +67,7 @@ class ModuleRunner(object):
                 net,
                 device_ids=[local_rank],
                 output_device=local_rank,
-                find_unused_parameters=True,
+                find_unused_parameters=True
             )
 
         if len(self.configer.get('gpu')) == 1:

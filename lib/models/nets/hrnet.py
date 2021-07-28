@@ -150,6 +150,44 @@ class HRNet_W48_OCR_CONTRAST(nn.Module):
         return {'seg': out, 'seg_aux': out_aux, 'embed': emb}
 
 
+class HRNet_W48_MEM(nn.Module):
+    def __init__(self, configer, dim=256, m=0.999, with_masked_ppm=False):
+        super(HRNet_W48_MEM, self).__init__()
+        self.configer = configer
+        self.m = m
+        self.r = self.configer.get('contrast', 'memory_size')
+        self.with_masked_ppm = with_masked_ppm
+
+        num_classes = self.configer.get('data', 'num_classes')
+
+        self.encoder_q = HRNet_W48_CONTRAST(configer)
+
+        self.register_buffer("segment_queue", torch.randn(num_classes, self.r, dim))
+        self.segment_queue = nn.functional.normalize(self.segment_queue, p=2, dim=2)
+        self.register_buffer("segment_queue_ptr", torch.zeros(num_classes, dtype=torch.long))
+
+        self.register_buffer("pixel_queue", torch.randn(num_classes, self.r, dim))
+        self.pixel_queue = nn.functional.normalize(self.pixel_queue, p=2, dim=2)
+        self.register_buffer("pixel_queue_ptr", torch.zeros(num_classes, dtype=torch.long))
+
+    @torch.no_grad()
+    def _momentum_update_key_encoder(self):
+        for param_q, param_k in zip(self.encoder_q.parameters(), self.encoder_k.parameters()):
+            param_k.data = param_k.data * self.m + param_q.data * (1. - self.m)
+
+    def forward(self, im_q, lb_q=None, with_embed=True, is_eval=False):
+        if is_eval is True or lb_q is None:
+            ret = self.encoder_q(im_q, with_embed=with_embed)
+            return ret
+
+        ret = self.encoder_q(im_q)
+
+        q = ret['embed']
+        out = ret['seg']
+
+        return {'seg': out, 'embed': q, 'key': q.detach(), 'lb_key': lb_q.detach()}
+
+
 class HRNet_W48_OCR(nn.Module):
     def __init__(self, configer):
         super(HRNet_W48_OCR, self).__init__()

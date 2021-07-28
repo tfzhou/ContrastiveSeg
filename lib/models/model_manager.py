@@ -25,7 +25,7 @@ from lib.models.nets.ideal_ocrnet import IdealSpatialOCRNet, IdealSpatialOCRNetB
 
 # HRNet
 from lib.models.nets.hrnet import HRNet_W48, HRNet_W48_CONTRAST
-from lib.models.nets.hrnet import HRNet_W48_OCR, HRNet_W48_OCR_B, HRNet_W48_OCR_B_HA, HRNet_W48_OCR_CONTRAST
+from lib.models.nets.hrnet import HRNet_W48_OCR, HRNet_W48_OCR_B, HRNet_W48_OCR_B_HA, HRNet_W48_OCR_CONTRAST, HRNet_W48_MEM
 
 # OCNet
 from lib.models.nets.ocnet import BaseOCNet, AspOCNet
@@ -74,6 +74,7 @@ SEG_MODEL_DICT = {
     'fcnet': FcnNet,
     'hrnet_w48_contrast': HRNet_W48_CONTRAST,
     'hrnet_w48_ocr_contrast': HRNet_W48_OCR_CONTRAST,
+    'hrnet_w48_mem': HRNet_W48_MEM,
     'deeplab_v3': DeepLabV3,
     'deeplab_v3_contrast': DeepLabV3Contrast,
     'ms_ocr': MscaleOCR,

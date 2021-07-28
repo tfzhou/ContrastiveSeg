@@ -18,6 +18,7 @@ from lib.loss.loss_helper import FSCELoss, FSAuxCELoss, FSAuxRMILoss, FSCELOVASZ
 from lib.loss.loss_helper import SegFixLoss
 from lib.loss.rmi_loss import RMILoss
 from lib.loss.loss_contrast import ContrastAuxCELoss, ContrastCELoss
+from lib.loss.loss_contrast_mem import ContrastCELoss as MemContrastCELoss
 
 from lib.utils.tools.logger import Logger as Log
 from lib.utils.distributed import is_distributed
@@ -36,7 +37,8 @@ SEG_LOSS_DICT = {
     'contrast_ce_loss': ContrastCELoss,
     'fs_ce_lovasz_loss': FSCELOVASZLoss,
     'ms_fs_aux_rmi_loss': MSFSAuxRMILoss,
-    'fs_auxce_dsn_loss': FSAuxCELossDSN
+    'fs_auxce_dsn_loss': FSAuxCELossDSN,
+    'mem_contrast_ce_loss': MemContrastCELoss
 }
 
 
