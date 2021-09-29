@@ -4,7 +4,7 @@
 
 > [**Exploring Cross-Image Pixel Contrast for Semantic Segmentation**](https://arxiv.org/abs/2101.11939),            
 > [Wenguan Wang](https://sites.google.com/view/wenguanwang/), [Tianfei Zhou](https://www.tfzhou.com/), [Fisher Yu](https://www.yf.io/), [Jifeng Dai](https://jifengdai.org/), [Ender Konukoglu](https://scholar.google.com/citations?user=OeEMrhQAAAAJ&hl=en) and [Luc Van Gool](https://scholar.google.com/citations?user=TwMib_QAAAAJ&hl=en) <br>
-> *arXiv technical report ([arXiv 2101.11939](https://arxiv.org/abs/2101.11939))*
+> *ICCV 2021 (Oral) ([arXiv 2101.11939](https://arxiv.org/abs/2101.11939))*
 
 ## News
 
