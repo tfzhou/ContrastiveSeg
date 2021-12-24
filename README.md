@@ -75,10 +75,11 @@ _It seems that the DeepLab-V3 baseline does not produce the expected performance
 
 ## Citation
 ```
-@article{wang2021exploring,
-  title   = {Exploring Cross-Image Pixel Contrast for Semantic Segmentation},
-  author  = {Wang, Wenguan and Zhou, Tianfei and Yu, Fisher and Dai, Jifeng and Konukoglu, Ender and Van Gool, Luc},
-  journal = {arXiv preprint arXiv:2101.11939},
-  year    = {2021}
+@inproceedings{Wang_2021_ICCV,
+    author    = {Wang, Wenguan and Zhou, Tianfei and Yu, Fisher and Dai, Jifeng and Konukoglu, Ender and Van Gool, Luc},
+    title     = {Exploring Cross-Image Pixel Contrast for Semantic Segmentation},
+    booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)},
+    year      = {2021},
+    pages     = {7303-7313}
 }
 ```
