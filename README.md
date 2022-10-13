@@ -8,7 +8,8 @@
 
 ## News
 
-* [2022-03-20] Our work [Rethinking Semantic Segmentation: A Prototype View](https://github.com/tfzhou/ProtoSeg) has been accepted to CVPR 2022 as an **Oral paper**. Code will come soon.
+* [2022-10-13] Our work [GMMSeg: Gaussian Mixture based Generative Semantic Segmentation Models](https://github.com/leonnnop/GMMSeg) has been accepted to NeurIPS'22.
+* [2022-03-20] Our work [Rethinking Semantic Segmentation: A Prototype View](https://github.com/tfzhou/ProtoSeg) has been accepted to CVPR'22 as an **Oral paper**. 
 * [2021-07-28] ContrastiveSeg has been accepted in ICCV'21 as Oral.
 * [2021-07-28] Update memory code.
 * [2021-07-01] The codebase has been transferred from Pytorch-0.4.1 to Pytorch-1.7.1, which will be easier for usage.
